@@ -7,9 +7,9 @@
 ////
 //// Internal links use `route.href/1` so modem intercepts them for client-side
 //// navigation. Social links are external and use `attribute.href/1` directly
-//// with `rel="me"` (apollo's default). The search button is a non-functional
-//// placeholder (Phase 12 wires up search); the theme toggle is wired via the
-//// `on_toggle_theme` attribute parameter (Phase 10).
+//// with `rel="me"` (apollo's default). The search button is wired via the
+//// `on_open_search` attribute parameter (Phase 12); the theme toggle is
+//// wired via the `on_toggle_theme` attribute parameter (Phase 10).
 
 import config.{type Config}
 import gleam/list
@@ -28,6 +28,7 @@ pub fn view(
   config: Config,
   current_route: Route,
   on_toggle_theme: Attribute(msg),
+  on_open_search: Attribute(msg),
 ) -> Element(msg) {
   html.nav([], [
     html.div([attribute.class("left-nav")], [
@@ -36,10 +37,10 @@ pub fn view(
     ]),
     html.div(
       [attribute.class("right-nav")],
-      // Menu items (internal links) followed by the search button (Phase 12
-      // placeholder) and the theme toggle (wired via on_toggle_theme).
+      // Menu items (internal links) followed by the search button (wired via
+      // on_open_search) and the theme toggle (wired via on_toggle_theme).
       list.append(view_menu(config.menu, current_route), [
-        view_search_button(),
+        view_search_button(on_open_search),
         view_theme_toggle(on_toggle_theme),
       ]),
     ),
@@ -147,12 +148,13 @@ fn view_menu(
   })
 }
 
-fn view_search_button() -> Element(msg) {
+fn view_search_button(on_open: Attribute(msg)) -> Element(msg) {
   html.button(
     [
       attribute.id("search-button"),
       attribute.class("search-button"),
-      attribute.title("Shortcut to open search"),
+      attribute.title("Cmd/Ctrl+K to open search"),
+      on_open,
     ],
     [
       html.img([
