@@ -33,5 +33,5 @@ pub fn subscribe_to_search_keys() -> Effect(SearchKeyEvent) {
   Nil
 }
 
-@external(javascript, "ffi/search.ffi.mjs", "subscribe_to_search_keys")
+@external(javascript, "../ffi/search.ffi.mjs", "subscribe_to_search_keys")
 fn subscribe(dispatch: fn(SearchKeyEvent) -> Nil) -> fn() -> Nil

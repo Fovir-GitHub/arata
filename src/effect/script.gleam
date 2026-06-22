@@ -36,8 +36,8 @@ pub fn render_mermaid(is_dark: Bool) -> Effect(Nil) {
   Nil
 }
 
-@external(javascript, "ffi/script.ffi.mjs", "typeset_math")
+@external(javascript, "../ffi/script.ffi.mjs", "typeset_math")
 fn do_typeset_math() -> Nil
 
-@external(javascript, "ffi/script.ffi.mjs", "render_mermaid")
+@external(javascript, "../ffi/script.ffi.mjs", "render_mermaid")
 fn do_render_mermaid(is_dark: Bool) -> Nil

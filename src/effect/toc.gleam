@@ -28,5 +28,5 @@ pub fn observe() -> Effect(String) {
   Nil
 }
 
-@external(javascript, "ffi/observer.ffi.mjs", "observe_toc")
+@external(javascript, "../ffi/observer.ffi.mjs", "observe_toc")
 fn observe_toc(dispatch: fn(String) -> Nil) -> Nil

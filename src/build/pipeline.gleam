@@ -1,16 +1,18 @@
 //// The build pipeline: orchestrates the content → `dist/` build, replacing
 //// Zola's role end-to-end.
 ////
-//// Running `gleam run -m arata/build` (on the Erlang target) walks the
-//// content, emits the JSON content index, search index, feeds, sitemap, a
-//// custom `index.html` with FOUC prevention, and a `404.html` redirect shim
-//// into the `dist/` directory. The Lustre SPA bundle is produced separately
-//// by `gleam run -m lustre/dev build --minify --outdir=dist`.
+//// Running `gleam run -m build/pipeline` produces a complete static site in
+//// `dist/`:
+////   1. Emits the JSON content index, search index, feeds, sitemap, a custom
+////      `index.html` with FOUC prevention, and a `404.html` redirect shim.
+////   2. Copies `src/arata.css` (the design system) to `dist/arata.css`.
+////   3. Copies all static assets (fonts, icons, images) from `static/` to
+////      `dist/`.
+////   4. Compiles the Gleam JavaScript and bundles it into `dist/app.mjs` via
+////      `bun build` (replacing `lustre/dev build`, which requires Erlang/OTP).
 ////
-//// For now, the content source is the Gleam constants in
-//// `data/sample_content` (the markdown-to-HTML pipeline is a future
-//// enhancement). The build step still produces all the static assets a
-//// real deployment needs.
+//// The content source is the Gleam constants in `data/sample_content` (the
+//// markdown-to-HTML pipeline is a future enhancement).
 
 import build/feeds
 import data/page.{type Page}
@@ -19,6 +21,7 @@ import data/project.{type Project}
 import data/sample_content
 import data/site
 import data/talk.{type Talk}
+import gleam/io
 import gleam/json
 import gleam/list
 import gleam/string
@@ -27,8 +30,16 @@ import simplifile
 /// The output directory for the built site.
 const dist_dir = "dist"
 
-/// Run the full build pipeline. Returns `Ok(Nil)` on success, or an error
-/// message if any file write fails.
+/// The source CSS file (in `src/`, not `static/`).
+const css_src = "src/arata.css"
+
+/// The static assets directory.
+const static_dir = "static"
+
+/// The compiled JavaScript entry point (produced by `gleam build`).
+const js_entry = "build/dev/javascript/arata/arata.mjs"
+
+/// Run the full build pipeline.
 pub fn main() -> Nil {
   let assert Ok(_) = run()
   Nil
@@ -44,17 +55,15 @@ pub fn run() -> Result(Nil, String) {
   let homepage = sample_content.homepage()
 
   // Ensure the dist directory exists.
-  let _ = simplifile.create_directory(dist_dir)
+  let _ = simplifile.create_directory_all(dist_dir)
 
-  // 1. Content index JSON (the SPA fetches this at boot in a future phase;
-  //    for now it's emitted for completeness and for future hydration).
+  // 1. Content index JSON.
   write(
     dist_dir <> "/content_index.json",
     content_index_json(site_meta, posts, projects, talks, pages, homepage),
   )
 
-  // 2. Search index JSON (elasticlunr-compatible shape; for now a simple
-  //    array of {title, description, tags, url} objects).
+  // 2. Search index JSON.
   write(dist_dir <> "/search_index.json", search_index_json(posts))
 
   // 3. Feeds.
@@ -68,17 +77,94 @@ pub fn run() -> Result(Nil, String) {
   // 5. Custom index.html with FOUC prevention.
   write(dist_dir <> "/index.html", index_html(site_meta))
 
-  // 6. 404.html redirect shim for static hosts (deep-link support).
+  // 6. 404.html redirect shim.
   write(dist_dir <> "/404.html", not_found_html())
+
+  // 7. Copy the design system CSS from src/ to dist/.
+  copy_file(css_src, dist_dir <> "/arata.css")
+
+  // 8. Copy all static assets (fonts, icons, images, vendored CSS) to dist/.
+  copy_directory_contents(static_dir, dist_dir)
+
+  // 9. Compile the Gleam JavaScript and bundle into dist/app.mjs.
+  bundle_spa()
+
+  io.println("Build complete. dist/ contains:")
+  io.println("  index.html, 404.html, app.mjs, arata.css,")
+  io.println("  content_index.json, search_index.json,")
+  io.println("  atom.xml, rss.xml, sitemap.xml,")
+  io.println("  fonts/, icons/, images/, css/")
 
   Ok(Nil)
 }
 
-/// Write `content` to `path`, creating parent directories as needed.
+/// Write `content` to `path`.
 fn write(path: String, content: String) -> Nil {
   let _ = simplifile.write(path, content)
   Nil
 }
+
+/// Copy a single file, logging on error.
+fn copy_file(src: String, dest: String) -> Nil {
+  case simplifile.copy(src, dest) {
+    Ok(_) -> Nil
+    Error(e) -> {
+      io.println("Warning: could not copy " <> src <> ": " <> simplify_error(e))
+      Nil
+    }
+  }
+}
+
+/// Copy the contents of a directory recursively. `simplifile.copy_directory`
+/// copies the directory itself (creating `dest/src/`); we want the contents
+/// at `dest/`, so we read and copy each entry.
+fn copy_directory_contents(src: String, dest: String) -> Nil {
+  case simplifile.read_directory(src) {
+    Ok(entries) ->
+      list.each(entries, fn(entry) {
+        let src_path = src <> "/" <> entry
+        let dest_path = dest <> "/" <> entry
+        case simplifile.copy_directory(src_path, dest_path) {
+          Ok(_) -> Nil
+          Error(_) -> copy_file(src_path, dest_path)
+        }
+      })
+    Error(e) ->
+      io.println("Warning: could not read " <> src <> ": " <> simplify_error(e))
+  }
+  Nil
+}
+
+/// Compile the Gleam JavaScript and bundle it into `dist/app.mjs` using
+/// `bun build`. This replaces `lustre/dev build` (which requires Erlang/OTP).
+/// `gleam build` must have already run (it does as part of `gleam run`).
+fn bundle_spa() -> Nil {
+  let cmd =
+    "bun build " <> js_entry <> " --outfile " <> dist_dir <> "/app.mjs --minify"
+  case run_command(cmd) {
+    0 -> Nil
+    code -> {
+      io.println(
+        "Warning: SPA bundle failed (exit "
+        <> int.to_string(code)
+        <> "). Run `"
+        <> cmd
+        <> "` manually to debug.",
+      )
+      Nil
+    }
+  }
+}
+
+/// Convert a simplifile FileError to a readable string.
+fn simplify_error(_e: simplifile.FileError) -> String {
+  "file error"
+}
+
+@external(javascript, "../ffi/shell.ffi.mjs", "run_command")
+fn run_command(command: String) -> Int
+
+import gleam/int
 
 /// The content index JSON: the full content tree serialized for the SPA to
 /// consume (or for future SSR hydration).

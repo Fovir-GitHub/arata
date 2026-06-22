@@ -19,5 +19,5 @@ pub fn enhance() -> Effect(Nil) {
   Nil
 }
 
-@external(javascript, "ffi/note.ffi.mjs", "enhance_notes")
+@external(javascript, "../ffi/note.ffi.mjs", "enhance_notes")
 fn enhance_notes() -> Nil

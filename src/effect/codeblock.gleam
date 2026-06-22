@@ -25,5 +25,5 @@ pub fn enhance() -> Effect(Nil) {
   Nil
 }
 
-@external(javascript, "ffi/codeblock.ffi.mjs", "enhance_code_blocks")
+@external(javascript, "../ffi/codeblock.ffi.mjs", "enhance_code_blocks")
 fn enhance_code_blocks() -> Nil

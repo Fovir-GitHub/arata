@@ -23,5 +23,5 @@ pub fn inject(analytics: Analytics) -> Effect(Nil) {
   Nil
 }
 
-@external(javascript, "ffi/analytics.ffi.mjs", "inject_analytics")
+@external(javascript, "../ffi/analytics.ffi.mjs", "inject_analytics")
 fn inject_analytics(analytics: Analytics) -> Nil

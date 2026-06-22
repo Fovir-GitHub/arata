@@ -77,14 +77,14 @@ fn theme_to_string(theme: Theme) -> String {
   }
 }
 
-@external(javascript, "ffi/theme.ffi.mjs", "get_theme")
+@external(javascript, "../ffi/theme.ffi.mjs", "get_theme")
 fn get_theme() -> String
 
-@external(javascript, "ffi/theme.ffi.mjs", "set_theme")
+@external(javascript, "../ffi/theme.ffi.mjs", "set_theme")
 fn set_theme(mode: String) -> Nil
 
-@external(javascript, "ffi/theme.ffi.mjs", "apply_theme")
+@external(javascript, "../ffi/theme.ffi.mjs", "apply_theme")
 fn apply_theme(mode: String) -> Nil
 
-@external(javascript, "ffi/theme.ffi.mjs", "subscribe_to_system_changes")
+@external(javascript, "../ffi/theme.ffi.mjs", "subscribe_to_system_changes")
 fn subscribe_to_system_changes(dispatch: fn(Bool) -> Nil) -> fn() -> Nil
