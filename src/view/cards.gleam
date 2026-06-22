@@ -101,7 +101,7 @@ fn row_indices(
   acc: List(Int),
 ) -> List(Int) {
   case row >= items_per_column {
-    True -> acc
+    True -> list.reverse(acc)
     False -> {
       let idx = row * columns + col
       let next_acc = case idx < total {
