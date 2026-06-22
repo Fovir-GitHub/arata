@@ -7,14 +7,14 @@
 ////
 //// Internal links use `route.href/1` so modem intercepts them for client-side
 //// navigation. Social links are external and use `attribute.href/1` directly
-//// with `rel="me"` (apollo's default). The search button and theme toggle are
-//// non-functional placeholders — Phase 5 wires up search, Phase 10 the theme
-//// toggle.
+//// with `rel="me"` (apollo's default). The search button is a non-functional
+//// placeholder (Phase 12 wires up search); the theme toggle is wired via the
+//// `on_toggle_theme` attribute parameter (Phase 10).
 
 import config.{type Config}
 import gleam/list
 import gleam/option
-import lustre/attribute
+import lustre/attribute.{type Attribute}
 import lustre/element.{type Element}
 import lustre/element/html
 import route.{type Route, Home, Page, Post, Posts, Projects, Talks}
@@ -24,7 +24,11 @@ import route.{type Route, Home, Page, Post, Posts, Projects, Talks}
 /// `current_route` is passed in so the active menu item can be highlighted
 /// with an `active` class (apollo itself does not highlight the active nav
 /// item; this is a small arata addition for better wayfinding).
-pub fn view(config: Config, current_route: Route) -> Element(msg) {
+pub fn view(
+  config: Config,
+  current_route: Route,
+  on_toggle_theme: Attribute(msg),
+) -> Element(msg) {
   html.nav([], [
     html.div([attribute.class("left-nav")], [
       view_site_title(config),
@@ -32,12 +36,11 @@ pub fn view(config: Config, current_route: Route) -> Element(msg) {
     ]),
     html.div(
       [attribute.class("right-nav")],
-      // Menu items (internal links) followed by two non-functional
-      // placeholder buttons; handlers arrive in Phase 5 (search) and
-      // Phase 10 (theme).
+      // Menu items (internal links) followed by the search button (Phase 12
+      // placeholder) and the theme toggle (wired via on_toggle_theme).
       list.append(view_menu(config.menu, current_route), [
         view_search_button(),
-        view_theme_toggle(),
+        view_theme_toggle(on_toggle_theme),
       ]),
     ),
   ])
@@ -161,12 +164,19 @@ fn view_search_button() -> Element(msg) {
   )
 }
 
-fn view_theme_toggle() -> Element(msg) {
+fn view_theme_toggle(on_toggle: Attribute(msg)) -> Element(msg) {
   // apollo renders this as an `<a id="dark-mode-toggle">` with inline
-  // `onclick`. arata uses a `<button>` (no handler yet) carrying both the
-  // apollo id and a class so the ported CSS (`#dark-mode-toggle`) applies.
+  // `onclick`. arata uses a `<button>` carrying both the apollo id and a class
+  // so the ported CSS (`#dark-mode-toggle`) applies. The `on_toggle` attribute
+  // (an `event.on_click(UserToggledTheme)` from the caller) dispatches the
+  // theme-cycle message. Three icons (sun/moon/auto) are rendered; the FFI
+  // shows/hides them based on the current theme.
   html.button(
-    [attribute.id("dark-mode-toggle"), attribute.class("theme-toggle")],
+    [
+      attribute.id("dark-mode-toggle"),
+      attribute.class("theme-toggle"),
+      on_toggle,
+    ],
     [
       html.img([
         attribute.src("/icons/sun.svg"),
@@ -177,6 +187,11 @@ fn view_theme_toggle() -> Element(msg) {
         attribute.src("/icons/moon.svg"),
         attribute.id("moon-icon"),
         attribute.alt("Dark"),
+      ]),
+      html.img([
+        attribute.src("/icons/auto.svg"),
+        attribute.id("auto-icon"),
+        attribute.alt("Auto"),
       ]),
     ],
   )

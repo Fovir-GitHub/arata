@@ -12,7 +12,8 @@
 //// grid), /tags (tag index), /tags/{name} (single tag), / (homepage), and
 //// /{slug} (standalone pages). A single post also renders a scroll-driven
 //// table of contents in the `.right-content` sidebar with IntersectionObserver
-//// active highlighting.
+//// active highlighting. The theme toggle (Phase 10) cycles Light/Dark/Auto
+//// with localStorage persistence and matchMedia reactivity.
 
 import config
 import data/page.{type Page}
@@ -20,6 +21,7 @@ import data/post.{type Post}
 import data/project.{type Project}
 import data/sample_content
 import data/talk.{type Talk}
+import effect/theme as theme_effect
 import effect/toc as toc_effect
 import gleam/option.{type Option}
 import lustre
@@ -27,6 +29,7 @@ import lustre/attribute
 import lustre/effect
 import lustre/element.{type Element, none}
 import lustre/element/html
+import lustre/event
 import modem
 import route.{
   type Route, Home, NotFound, Page, Post, Posts, Projects, Tag, Tags, Talks,
@@ -71,6 +74,10 @@ pub type Model {
     pages: List(Page),
     /// The id of the heading currently highlighted in the TOC, or `None`.
     active_heading: Option(String),
+    /// The user's saved theme choice (Light/Dark/Auto).
+    theme: theme_effect.Theme,
+    /// Whether the OS prefers dark mode (used to resolve `Auto`).
+    system_prefers_dark: Bool,
   )
 }
 
@@ -91,15 +98,19 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       homepage: sample_content.homepage(),
       pages: sample_content.pages(),
       active_heading: option.None,
+      theme: theme_effect.Light,
+      system_prefers_dark: False,
     )
 
   // Initialise modem so internal `<a>` clicks are intercepted and dispatched
   // as `UserNavigatedTo` messages instead of triggering a full page reload.
   // If the initial route is a single post, also kick off the TOC observer.
+  // The theme init effect reads localStorage + subscribes to matchMedia.
   let nav_effect =
     modem.init(fn(uri) { uri |> route.parse_route |> UserNavigatedTo })
   let toc_effect = toc_effect_for(initial_route)
-  let effects = effect.batch([nav_effect, toc_effect])
+  let theme_init = effect.map(theme_effect.init_theme(), theme_msg_to_msg)
+  let effects = effect.batch([nav_effect, toc_effect, theme_init])
 
   #(model, effects)
 }
@@ -110,6 +121,12 @@ pub type Msg {
   UserNavigatedTo(route: Route)
   /// The TOC IntersectionObserver reported a new active heading.
   TocActiveHeadingChanged(id: String)
+  /// The user clicked the theme toggle button.
+  UserToggledTheme
+  /// The saved/system theme was loaded at startup.
+  ThemeLoaded(theme: theme_effect.Theme)
+  /// The OS theme preference changed.
+  SystemPrefersDarkChanged(prefers_dark: Bool)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
@@ -125,6 +142,39 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       Model(..model, active_heading: option.Some(id)),
       effect.none(),
     )
+    UserToggledTheme -> {
+      // 3-state cycle: Light -> Dark -> Auto -> Light (apollo's toggle-auto).
+      let next_theme = case model.theme {
+        theme_effect.Light -> theme_effect.Dark
+        theme_effect.Dark -> theme_effect.Auto
+        theme_effect.Auto -> theme_effect.Light
+      }
+      #(
+        Model(..model, theme: next_theme),
+        effect.map(
+          theme_effect.apply_theme_choice(next_theme),
+          theme_msg_to_msg,
+        ),
+      )
+    }
+    ThemeLoaded(theme) -> {
+      // The FFI has already applied the theme to the DOM; we just store it.
+      #(Model(..model, theme:), effect.none())
+    }
+    SystemPrefersDarkChanged(prefers_dark) -> {
+      // When the OS preference changes and the user chose Auto, re-apply the
+      // theme so the <html> class updates.
+      let model = Model(..model, system_prefers_dark: prefers_dark)
+      let eff = case model.theme {
+        theme_effect.Auto ->
+          effect.map(
+            theme_effect.apply_theme_choice(model.theme),
+            theme_msg_to_msg,
+          )
+        _ -> effect.none()
+      }
+      #(model, eff)
+    }
   }
 }
 
@@ -134,6 +184,15 @@ fn toc_effect_for(route: Route) -> effect.Effect(Msg) {
   case route {
     Post(_) -> effect.map(toc_effect.observe(), TocActiveHeadingChanged)
     _ -> effect.none()
+  }
+}
+
+/// Map a `ThemeMsg` (from the theme effect) into the app's `Msg` type.
+fn theme_msg_to_msg(tm: theme_effect.ThemeMsg) -> Msg {
+  case tm {
+    theme_effect.ThemeLoaded(theme) -> ThemeLoaded(theme:)
+    theme_effect.SystemPrefersDarkChanged(prefers_dark) ->
+      SystemPrefersDarkChanged(prefers_dark:)
   }
 }
 
@@ -169,7 +228,7 @@ fn view(model: Model) -> Element(Msg) {
 
   layout.view(
     [
-      header.view(model.config, model.route),
+      header.view(model.config, model.route, event.on_click(UserToggledTheme)),
       main_content,
       footer.view(model.config),
     ],
