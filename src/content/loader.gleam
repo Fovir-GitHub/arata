@@ -1,20 +1,13 @@
 //// Content loader: reads `.md` files from `content/posts/` and `content/pages/`
-//// at startup, parses TOML frontmatter (`+++ ... +++`), and renders the
-//// markdown body via mork. This replaces the hardcoded content in
-//// `sample_content.gleam` with a Zola-like file-based content model.
+//// at build time, parses TOML frontmatter, and renders the markdown body via
+//// mork. The result is serialized to `content_index.json` by the build
+//// pipeline. The SPA fetches this JSON at startup instead of reading files
+//// directly (which would require `simplifile` — a Node-only dependency that
+//// breaks browser builds).
 ////
-//// Frontmatter format (TOML, between `+++` delimiters):
-////   +++
-////   title = "Post Title"
-////   date = "2025-01-15"
-////   updated = "2025-01-20"  # optional
-////   description = "Short description"
-////   tags = ["tag1", "tag2"]  # optional
-////   draft = false  # optional, defaults to false
-////   tldr = "One-line summary"  # optional
-////   +++
-////
-//// The rest of the file is markdown, parsed by mork at load time.
+//// This module is **build-time only**. It must NOT be imported by the SPA
+//// entry chain (`arata.gleam` → `sample_content.gleam`). The SPA uses
+//// `runtime_content.gleam` instead, which fetches the pre-built JSON.
 
 import data/markdown
 import data/page.{type Page, Page}
@@ -143,9 +136,7 @@ fn load_page(path: String, filename: String) -> Result(Page, Nil) {
   Ok(Page(slug: slug, title: title, body: html_body, subtitle: subtitle))
 }
 
-/// Split a markdown file into frontmatter and body. The frontmatter is
-/// between `+++` delimiters (Zola-style TOML). If there's no frontmatter,
-/// returns an empty string for the frontmatter and the full content as body.
+/// Split a markdown file into frontmatter and body.
 fn split_frontmatter(content: String) -> #(String, String) {
   case string.split_once(content, "+++\n") {
     Error(_) -> #("", content)
@@ -157,9 +148,7 @@ fn split_frontmatter(content: String) -> #(String, String) {
   }
 }
 
-/// Extract a simple table of contents from the markdown body: one TocEntry
-/// per `## ` (h2) heading. The id is derived from the heading text
-/// (lowercased, spaces replaced with hyphens).
+/// Extract a simple table of contents from the markdown body.
 fn extract_toc(markdown: String) -> List(TocEntry) {
   markdown
   |> string.split("\n")

@@ -16,6 +16,7 @@
 //// with localStorage persistence and matchMedia reactivity.
 
 import config
+import content/runtime as content_runtime
 import data/page.{type Page}
 import data/post.{type Post}
 import data/project.{type Project}
@@ -33,6 +34,7 @@ import effect/toc as toc_effect
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
+import gleam/result
 import lustre
 import lustre/attribute
 import lustre/effect
@@ -117,11 +119,20 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       route: initial_route,
       config: config.default(),
       site_meta: site.default(),
-      posts: sample_content.posts(),
+      // Posts/pages/homepage are loaded asynchronously from
+      // `content_index.json` via `content_runtime.load()`; they start empty
+      // and are populated when `ContentLoaded` arrives. Projects and talks
+      // are still loaded synchronously from `sample_content`.
+      posts: [],
       projects: sample_content.projects(),
       talks: sample_content.talks(),
-      homepage: sample_content.homepage(),
-      pages: sample_content.pages(),
+      homepage: page.Page(
+        slug: "home",
+        title: "arata",
+        body: "",
+        subtitle: option.None,
+      ),
+      pages: [],
       active_heading: option.None,
       theme: theme_effect.Light,
       system_prefers_dark: False,
@@ -148,6 +159,9 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
     effect.map(analytics_effect.inject(model.site_meta.analytics), fn(_) {
       NoOp
     })
+  // Kick off the async fetch of `content_index.json`. The result arrives as
+  // a `ContentLoaded` message that populates `posts`, `pages`, `homepage`.
+  let content_eff = effect.map(content_runtime.load(), content_msg_to_msg)
   let effects =
     effect.batch([
       nav_effect,
@@ -155,6 +169,7 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       theme_init,
       search_keys,
       analytics_eff,
+      content_eff,
     ])
 
   #(model, effects)
@@ -175,6 +190,8 @@ pub type Msg {
   /// A no-op message for effects that dispatch nothing (e.g. the code-block
   /// enhancer, which only performs a side effect).
   NoOp
+  /// Content was loaded from `content_index.json`.
+  ContentLoaded(result: Result(content_runtime.Content, Nil))
   // SEARCH -----------------------------------------------------------------
   /// The user clicked the search button or pressed Cmd/Ctrl+K.
   UserOpenedSearch
@@ -250,6 +267,24 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       #(new_model, effect.batch([theme_eff, mermaid_rerender_for(new_model)]))
     }
     NoOp -> #(model, effect.none())
+    ContentLoaded(result) -> {
+      // Replace the empty placeholder content with the fetched posts/pages/
+      // homepage. On error (e.g. fetch failed), keep the empty defaults so
+      // the app still renders the shell.
+      case result {
+        Ok(content) -> {
+          let model =
+            Model(
+              ..model,
+              posts: content.posts,
+              pages: content.pages,
+              homepage: content.homepage,
+            )
+          #(model, effect.none())
+        }
+        Error(_) -> #(model, effect.none())
+      }
+    }
     // SEARCH -------------------------------------------------------------
     UserOpenedSearch -> #(
       Model(
@@ -366,6 +401,16 @@ fn theme_msg_to_msg(tm: theme_effect.ThemeMsg) -> Msg {
     theme_effect.ThemeLoaded(theme) -> ThemeLoaded(theme:)
     theme_effect.SystemPrefersDarkChanged(prefers_dark) ->
       SystemPrefersDarkChanged(prefers_dark:)
+  }
+}
+
+/// Map a `ContentMsg` (from the content runtime) into the app's `Msg` type.
+/// The `rsvp.Error` from the fetch is collapsed to `Nil` — we don't surface
+/// the specific error to the user, the content just stays empty.
+fn content_msg_to_msg(cm: content_runtime.ContentMsg) -> Msg {
+  case cm {
+    content_runtime.ContentLoaded(result) ->
+      ContentLoaded(result |> result.map_error(fn(_) { Nil }))
   }
 }
 

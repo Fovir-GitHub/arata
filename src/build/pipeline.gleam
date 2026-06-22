@@ -15,8 +15,9 @@
 //// markdown-to-HTML pipeline is a future enhancement).
 
 import build/feeds
+import content/loader
 import data/page.{type Page}
-import data/post.{type Post}
+import data/post.{type Post, type TocEntry}
 import data/project.{type Project}
 import data/sample_content
 import data/site
@@ -45,11 +46,11 @@ pub fn main() -> Nil {
 /// Run the build pipeline, returning a result.
 pub fn run() -> Result(Nil, String) {
   let site_meta = site.default()
-  let posts = sample_content.posts()
+  let posts = loader.load_posts()
   let projects = sample_content.projects()
   let talks = sample_content.talks()
-  let pages = sample_content.pages()
-  let homepage = sample_content.homepage()
+  let pages = loader.load_pages()
+  let homepage = loader.load_homepage()
 
   // Ensure the dist directory exists.
   let _ = simplifile.create_directory_all(dist_dir)
@@ -154,7 +155,7 @@ fn bundle_spa() -> Nil {
     <> shim_path
     <> " --outfile "
     <> dist_dir
-    <> "/app.mjs --minify --target=node"
+    <> "/app.mjs --minify --target=browser 2>/dev/null"
   case run_command(cmd) {
     0 -> Nil
     code -> {
@@ -179,6 +180,7 @@ fn simplify_error(_e: simplifile.FileError) -> String {
 fn run_command(command: String) -> Int
 
 import gleam/int
+import gleam/option.{None, Some}
 
 /// The content index JSON: the full content tree serialized for the SPA to
 /// consume (or for future SSR hydration).
@@ -202,9 +204,21 @@ fn content_index_json(
         #("slug", json.string(post.slug)),
         #("title", json.string(post.title)),
         #("date", json.string(post.date)),
+        #("updated", case post.updated {
+          Some(s) -> json.string(s)
+          None -> json.null()
+        }),
         #("description", json.string(post.description)),
+        #("body", json.string(post.body)),
+        #("toc", json.array(post.toc, toc_entry_json)),
         #("tags", json.array(post.tags, json.string)),
         #("draft", json.bool(post.draft)),
+        #("tldr", case post.tldr {
+          Some(s) -> json.string(s)
+          None -> json.null()
+        }),
+        #("word_count", json.int(post.word_count)),
+        #("reading_time", json.int(post.reading_time)),
       ])
     })
   let projects_arr =
@@ -229,12 +243,22 @@ fn content_index_json(
       json.object([
         #("slug", json.string(page.slug)),
         #("title", json.string(page.title)),
+        #("body", json.string(page.body)),
+        #("subtitle", case page.subtitle {
+          Some(s) -> json.string(s)
+          None -> json.null()
+        }),
       ])
     })
   let home_obj =
     json.object([
       #("slug", json.string(homepage.slug)),
       #("title", json.string(homepage.title)),
+      #("body", json.string(homepage.body)),
+      #("subtitle", case homepage.subtitle {
+        Some(s) -> json.string(s)
+        None -> json.null()
+      }),
     ])
   json.to_string(
     json.object([
@@ -246,6 +270,15 @@ fn content_index_json(
       #("homepage", home_obj),
     ]),
   )
+}
+
+/// Serialize a `TocEntry` as `{"id": ..., "title": ..., "children": [...]}`.
+fn toc_entry_json(entry: TocEntry) -> json.Json {
+  json.object([
+    #("id", json.string(entry.id)),
+    #("title", json.string(entry.title)),
+    #("children", json.array(entry.children, toc_entry_json)),
+  ])
 }
 
 /// The search index JSON: a simple array of searchable documents.

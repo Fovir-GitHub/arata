@@ -1,31 +1,16 @@
 //// Sample content for arata.
 ////
-//// Posts and pages are loaded from `content/posts/` and `content/pages/`
-//// markdown files at startup via the content loader (Zola-like file-based
-//// content model). Projects and talks remain Gleam constants (they don't
-//// have markdown bodies — just structured data for card grids).
+//// This module is a thin compatibility layer. The SPA loads content from
+//// `content_index.json` at startup (see `content/runtime.gleam`). The
+//// build-time content loader (`content/loader.gleam`) reads `.md` files and
+//// the build pipeline serializes them to JSON.
+////
+//// Projects and talks remain Gleam constants (structured data for card grids,
+//// no markdown bodies).
 
-import content/loader
-import data/page.{type Page}
-import data/post.{type Post}
 import data/project.{type Project, Project}
 import data/talk.{type Talk, Talk}
 import gleam/option.{None, Some}
-
-/// Load all posts from content/posts/*.md
-pub fn posts() -> List(Post) {
-  loader.load_posts()
-}
-
-/// Load all pages from content/pages/*.md
-pub fn pages() -> List(Page) {
-  loader.load_pages()
-}
-
-/// Load the homepage from content/pages/home.md
-pub fn homepage() -> Page {
-  loader.load_homepage()
-}
 
 pub fn projects() -> List(Project) {
   [
