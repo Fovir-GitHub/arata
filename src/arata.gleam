@@ -23,6 +23,7 @@ import data/sample_content
 import data/search.{type SearchResult}
 import data/talk.{type Talk}
 import effect/codeblock as codeblock_effect
+import effect/note as note_effect
 import effect/search as search_effect
 import effect/theme as theme_effect
 import effect/toc as toc_effect
@@ -290,6 +291,7 @@ fn post_effects_for(route: Route) -> effect.Effect(Msg) {
       effect.batch([
         effect.map(toc_effect.observe(), TocActiveHeadingChanged),
         effect.map(codeblock_effect.enhance(), fn(_) { NoOp }),
+        effect.map(note_effect.enhance(), fn(_) { NoOp }),
       ])
     _ -> effect.none()
   }

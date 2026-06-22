@@ -181,6 +181,76 @@ gleam add --dev lustre_dev_tools</code></pre>
       word_count: 40,
       reading_time: 1,
     ),
+    Post(
+      slug: "shortcodes-demo",
+      title: "Shortcodes demo",
+      date: "2025-02-15",
+      updated: None,
+      description: "A demonstration of arata's note, character, image, and mermaid shortcodes.",
+      body: "
+        <p>
+          This post exercises the four shortcodes arata supports: notes (static
+          and dynamic), character speech bubbles, images, and mermaid diagrams.
+        </p>
+
+        <h2 id='notes'>Notes</h2>
+        <p>Static note:</p>
+        <div class='note-container'>
+          <div class='note-header'>
+            <div class='note-icon'>Tip</div>
+          </div>
+          <div class='note-content'>
+            <p>This is a static note. The content is always visible.</p>
+          </div>
+        </div>
+        <p>Dynamic (clickable) note — click the header to toggle:</p>
+        <div class='note-container'>
+          <button class='note-toggle'>
+            <div class='note-icon'>Expand for details</div>
+          </button>
+          <div class='note-content' style='display: none;'>
+            <p>This note was hidden by default. Click the toggle to show/hide
+            it. The toggle behaviour is wired by an FFI post-processor that
+            attaches click handlers to <code>.note-toggle</code> buttons after
+            each post view renders.</p>
+          </div>
+        </div>
+
+        <h2 id='character'>Character</h2>
+        <div class='character-note character-hooded character-comment character-right'>
+          <div class='character-avatar'>
+            <img src='/images/characters/hooded.png' alt='hooded' width='80' height='80' />
+          </div>
+          <div class='character-content'>
+            <div class='character-bubble'>
+              <p>The hooded figure speaks: shortcodes let you embed rich
+              content inside markdown bodies.</p>
+            </div>
+          </div>
+        </div>
+
+        <h2 id='mermaid'>Mermaid</h2>
+        <p>A mermaid diagram (rendered client-side by the mermaid library in
+        Phase 14):</p>
+        <pre class='mermaid'>graph LR
+  A[Markdown] --> B[Build Pipeline]
+  B --> C[Content Index JSON]
+  C --> D[Lustre SPA]
+  D --> E[Rendered Blog]</pre>
+      ",
+      toc: [
+        TocEntry(id: "notes", title: "Notes", children: []),
+        TocEntry(id: "character", title: "Character", children: []),
+        TocEntry(id: "mermaid", title: "Mermaid", children: []),
+      ],
+      tags: ["shortcodes", "demo"],
+      draft: False,
+      tldr: Some(
+        "Notes, characters, images, and mermaid diagrams — all the shortcodes arata supports.",
+      ),
+      word_count: 180,
+      reading_time: 1,
+    ),
   ]
 }
 
