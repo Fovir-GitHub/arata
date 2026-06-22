@@ -1,11 +1,24 @@
 //// Routing: maps browser URLs to arata's internal `Route` type and back.
 ////
-//// This is a scaffold stub. The full implementation — covering every apollo
-//// page (home, posts, single post, projects, talks, tags, single tag, static
-//// page, 404) — is tracked in `ROADMAP.md` (Phase 2).
-////
 //// Patterned after the `01-routing` Lustre example, using `modem` for
-//// client-side navigation over the History API.
+//// client-side navigation over the History API. `parse_route` turns a `Uri`
+//// into a typed `Route`, and `href` turns a `Route` back into an `href`
+//// attribute for `<a>` elements. The two functions must stay in sync so every
+//// internal link round-trips through `parse_route` to the same `Route`.
+////
+//// URL scheme (mirrors apollo's content layout):
+////
+////   `/`                  -> Home
+////   `/posts`             -> Posts           (section index)
+////   `/posts/{slug}`      -> Post(slug)
+////   `/projects`          -> Projects        (section index)
+////   `/projects/{slug}`   -> Page(slug)      (project detail renders as a page)
+////   `/talks`             -> Talks           (section index)
+////   `/talks/{slug}`      -> Page(slug)      (talk detail renders as a page)
+////   `/tags`              -> Tags            (taxonomy index)
+////   `/tags/{name}`       -> Tag(name)
+////   `/{slug}`            -> Page(slug)      (standalone page, e.g. /about)
+////   anything else        -> NotFound(uri)
 
 import gleam/uri.{type Uri}
 import lustre/attribute.{type Attribute}
@@ -20,17 +33,59 @@ pub type Route {
   Tags
   Tag(name: String)
   Page(slug: String)
-  /// A URI we could not match. Kept so we can log it or hint at a typo.
+  /// A URI we could not match. Kept so we can log it or hint at a typo. Note
+  /// that `NotFound` cannot round-trip through `href` (its URL is a placeholder
+  /// `/404`); every other variant does.
   NotFound(uri: Uri)
 }
 
-/// Parse a browser URI into a `Route`. Not yet implemented.
-pub fn parse_route(_uri: Uri) -> Route {
-  todo as "parse_route: map URI path segments to Route variants (ROADMAP Phase 2)"
+/// Parse a browser URI into a `Route`.
+///
+/// Section indices (`/posts`, `/projects`, `/talks`, `/tags`) are matched
+/// before single-segment standalone pages so that e.g. `/posts` is `Posts` and
+/// not `Page("posts")`. Detail pages under `/projects/` and `/talks/` parse as
+/// `Page(slug)` — apollo renders both as `page.html`.
+pub fn parse_route(uri: Uri) -> Route {
+  case uri.path_segments(uri.path) {
+    [] | [""] -> Home
+    ["posts"] -> Posts
+    ["posts", slug] -> Post(slug:)
+    ["projects"] -> Projects
+    ["projects", slug] -> Page(slug:)
+    ["talks"] -> Talks
+    ["talks", slug] -> Page(slug:)
+    ["tags"] -> Tags
+    ["tags", name] -> Tag(name:)
+    // Any other single segment is a standalone page (e.g. /about, /404).
+    [slug] -> Page(slug:)
+    // Anything with two or more segments that didn't match above is unknown.
+    _ -> NotFound(uri:)
+  }
 }
 
 /// Serialise a `Route` back into an `href` attribute for `<a>` elements.
-/// Must stay in sync with `parse_route`. Not yet implemented.
-pub fn href(_route: Route) -> Attribute(message) {
-  todo as "href: serialise Route to a URL string (ROADMAP Phase 2)"
+///
+/// Must stay in sync with `parse_route`. For every `Route` produced by
+/// `parse_route` except `NotFound`, `parse_route(href_url(route)) == route`.
+/// `NotFound` is by definition a non-matching URI, so its `href` is a
+/// placeholder (`/404`) that parses to `Page("404")` — this is intentional and
+/// matches the lustre `01-routing` example's behaviour.
+pub fn href(route: Route) -> Attribute(message) {
+  attribute.href(href_url(route))
+}
+
+/// The URL string a `Route` serialises to. Exposed so other modules can build
+/// links without going through the `Attribute` type (e.g. for `modem.push`).
+pub fn href_url(route: Route) -> String {
+  case route {
+    Home -> "/"
+    Posts -> "/posts"
+    Post(slug) -> "/posts/" <> slug
+    Projects -> "/projects"
+    Talks -> "/talks"
+    Tags -> "/tags"
+    Tag(name) -> "/tags/" <> name
+    Page(slug) -> "/" <> slug
+    NotFound(_) -> "/404"
+  }
 }
