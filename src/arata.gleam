@@ -36,6 +36,7 @@ import view/header
 import view/layout
 import view/post as post_view
 import view/post_list
+import view/tags
 import view/talks
 import view/toc as toc_view
 
@@ -145,8 +146,12 @@ fn view(model: Model) -> Element(Msg) {
       }
     Projects -> #(cards.view(model.projects), none())
     Talks -> #(talks.view(model.talks), none())
-    Tags -> #(view_tags(), none())
-    Tag(name) -> #(view_tag(name), none())
+    Tags -> #(tags.view_list(post.tag_index(model.posts)), none())
+    Tag(name) ->
+      case post.find_tag(post.tag_index(model.posts), name) {
+        Ok(entry) -> #(tags.view_single(entry.name, entry.posts), none())
+        Error(Nil) -> #(view_not_found(), none())
+      }
     Page(slug) -> #(view_page(slug), none())
     NotFound(_) -> #(view_not_found(), none())
   }
@@ -164,18 +169,10 @@ fn view(model: Model) -> Element(Msg) {
 // PLACEHOLDER PAGE VIEWS ------------------------------------------------------
 //
 // These routes still render `.page-header` placeholders; full rendering is
-// Phases 8-9 (tag lists, standalone pages, homepage).
+// Phase 9 (homepage, standalone pages).
 
 fn view_home() -> Element(Msg) {
   page_main("Home")
-}
-
-fn view_tags() -> Element(Msg) {
-  page_main("Tags")
-}
-
-fn view_tag(name: String) -> Element(Msg) {
-  page_main("Tag: " <> name)
 }
 
 fn view_page(slug: String) -> Element(Msg) {

@@ -40,10 +40,18 @@ pub fn view(posts: List(Post), current_page: Int, per_page: Int) -> Element(msg)
 
   html.div([], [
     html.div([attribute.class("page-header")], [html.text("Posts")]),
-    html.main([attribute.class("post-list")], [
-      html.ul([], list.map(page_posts, view_list_item)),
-    ]),
+    view_items(page_posts),
     view_pagination(current_page, has_prev, has_next),
+  ])
+}
+
+/// Render the bare post list — a `<main class="post-list"><ul>` of `.list-item`
+/// entries with no page-header and no pagination. Exposed so the tag-single
+/// page (and any other list context) can reuse the same per-item rendering
+/// with its own header.
+pub fn view_items(posts: List(Post)) -> Element(msg) {
+  html.main([attribute.class("post-list")], [
+    html.ul([], list.map(posts, view_list_item)),
   ])
 }
 
