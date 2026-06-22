@@ -7,18 +7,18 @@
 //// stores the current `Route` in the model, and the `view` function dispatches
 //// to a per-route view wrapped in the apollo 3-column shell.
 ////
-//// The `/posts` index and `/posts/{slug}` single-post routes are fully wired
-//// (Phases 5-6): the list paginates the sample content, and a single post
-//// renders its title, meta row (date, updated, word count, reading time),
-//// optional tl;dr box, body, and tags. A scroll-driven table of contents in
-//// the `.right-content` sidebar highlights the active heading via an
-//// IntersectionObserver effect. The remaining routes (home, projects, talks,
+//// The `/posts` index, `/posts/{slug}` single-post, `/projects` cards grid,
+//// and `/talks` grid routes are fully wired (Phases 5-7). A single post also
+//// renders a scroll-driven table of contents in the `.right-content` sidebar
+//// with IntersectionObserver active highlighting. The remaining routes (home,
 //// tags, standalone pages) still render `.page-header` placeholders pending
-//// Phases 7-9.
+//// Phases 8-9.
 
 import config
 import data/post.{type Post}
+import data/project.{type Project}
 import data/sample_content
+import data/talk.{type Talk}
 import effect/toc as toc_effect
 import gleam/option.{type Option}
 import lustre
@@ -30,11 +30,13 @@ import modem
 import route.{
   type Route, Home, NotFound, Page, Post, Posts, Projects, Tag, Tags, Talks,
 }
+import view/cards
 import view/footer
 import view/header
 import view/layout
 import view/post as post_view
 import view/post_list
+import view/talks
 import view/toc as toc_view
 
 // MAIN ------------------------------------------------------------------------
@@ -59,6 +61,8 @@ pub type Model {
     route: Route,
     config: config.Config,
     posts: List(Post),
+    projects: List(Project),
+    talks: List(Talk),
     /// The id of the heading currently highlighted in the TOC, or `None`.
     active_heading: Option(String),
   )
@@ -76,6 +80,8 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       route: initial_route,
       config: config.default(),
       posts: sample_content.posts(),
+      projects: sample_content.projects(),
+      talks: sample_content.talks(),
       active_heading: option.None,
     )
 
@@ -137,8 +143,8 @@ fn view(model: Model) -> Element(Msg) {
         )
         Error(Nil) -> #(view_not_found(), none())
       }
-    Projects -> #(view_projects(), none())
-    Talks -> #(view_talks(), none())
+    Projects -> #(cards.view(model.projects), none())
+    Talks -> #(talks.view(model.talks), none())
     Tags -> #(view_tags(), none())
     Tag(name) -> #(view_tag(name), none())
     Page(slug) -> #(view_page(slug), none())
@@ -158,18 +164,10 @@ fn view(model: Model) -> Element(Msg) {
 // PLACEHOLDER PAGE VIEWS ------------------------------------------------------
 //
 // These routes still render `.page-header` placeholders; full rendering is
-// Phases 7-9 (projects grid, talks grid, tag lists, standalone pages).
+// Phases 8-9 (tag lists, standalone pages, homepage).
 
 fn view_home() -> Element(Msg) {
   page_main("Home")
-}
-
-fn view_projects() -> Element(Msg) {
-  page_main("Projects")
-}
-
-fn view_talks() -> Element(Msg) {
-  page_main("Talks")
 }
 
 fn view_tags() -> Element(Msg) {
