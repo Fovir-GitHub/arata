@@ -5,9 +5,10 @@
 //// `dist/`:
 ////   1. Emits the JSON content index, search index, feeds, sitemap, a custom
 ////      `index.html` with FOUC prevention, and a `404.html` redirect shim.
-////   2. Concatenates the CSS modules under `src/css/` (base, layout,
-////      components, post, cards, links, search, toc, syntax, accessibility)
-////      into a single `dist/arata.css` design system.
+////   2. Copies each CSS module under `src/css/` (base, layout, components,
+////      post, cards, links, search, toc, syntax, accessibility) to
+////      `dist/css/` as a separate file, allowing the browser to load them
+////      in parallel and cache independently (true on-demand loading).
 ////   3. Copies all static assets (fonts, icons, images) from `static/` to
 ////      `dist/`.
 ////   4. Compiles the Gleam JavaScript and bundles it into `dist/app.mjs` via
@@ -29,15 +30,17 @@ import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
 import gleam/string
 import simplifile
 
 /// The output directory for the built site.
 const dist_dir = "dist"
 
-/// The CSS modules that, concatenated in order, produce `dist/arata.css`.
-/// `base.css` must come first (theme variables + resets); the rest follow the
-/// dependency order so cascade specificity resolves as intended.
+/// The CSS modules that are copied, in order, to `dist/css/` as separate
+/// files. `base.css` must come first (theme variables + resets); the rest
+/// follow the dependency order so cascade specificity resolves as intended.
+/// The `<link>` tags in `index.html` reference each file in this same order.
 const css_modules = [
   "src/css/base.css",
   "src/css/layout.css",
@@ -103,7 +106,7 @@ pub fn run() -> Result(Nil, String) {
   // 6. 404.html redirect shim.
   write(dist_dir <> "/404.html", not_found_html())
 
-  // 7. Concatenate the CSS modules from src/css/ into dist/arata.css.
+  // 7. Copy each CSS module from src/css/ to dist/css/ as a separate file.
   build_css()
 
   // 8. Copy all static assets (fonts, icons, images, vendored CSS) to dist/.
@@ -113,7 +116,7 @@ pub fn run() -> Result(Nil, String) {
   bundle_spa()
 
   io.println("Build complete. dist/ contains:")
-  io.println("  index.html, 404.html, app.mjs, arata.css,")
+  io.println("  index.html, 404.html, app.mjs,")
   io.println("  content_index.json, search_index.json,")
   case site_meta.rss_enabled {
     True -> io.println("  atom.xml, rss.xml, sitemap.xml,")
@@ -130,28 +133,29 @@ fn write(path: String, content: String) -> Nil {
   Nil
 }
 
-/// Concatenate the CSS modules listed in `css_modules` (in order) into a
-/// single `dist/arata.css`. Each module is read independently; a missing
-/// module is treated as empty so a partial split still produces a buildable
-/// stylesheet (with a warning logged).
+/// Copy each CSS module listed in `css_modules` to `dist/css/` as a separate
+/// file (true on-demand loading). Each file is loaded by its own `<link>` tag
+/// in `index.html`, so the browser can fetch them in parallel and cache them
+/// independently. A missing module is logged but does not abort the build.
 fn build_css() -> Nil {
-  let contents =
-    list.map(css_modules, fn(path) {
-      case simplifile.read(from: path) {
-        Ok(content) -> content
-        Error(e) -> {
-          io.println(
-            "Warning: could not read CSS module "
-            <> path
-            <> ": "
-            <> simplify_error(e),
-          )
-          ""
-        }
-      }
-    })
-  let combined = string.join(contents, "\n")
-  let _ = simplifile.write(to: dist_dir <> "/arata.css", contents: combined)
+  let _ = simplifile.create_directory_all(dist_dir <> "/css")
+  list.each(css_modules, fn(path) {
+    let filename =
+      path
+      |> string.split("/")
+      |> list.last
+      |> result.unwrap("unknown.css")
+    case simplifile.copy(path, dist_dir <> "/css/" <> filename) {
+      Ok(_) -> Nil
+      Error(e) ->
+        io.println(
+          "Warning: could not copy CSS module "
+          <> path
+          <> ": "
+          <> simplify_error(e),
+        )
+    }
+  })
   Nil
 }
 
@@ -196,6 +200,19 @@ fn copy_directory_contents(src: String, dest: String) -> Nil {
 /// `main()`. We do the same: write a temporary `entry.mjs` that imports
 /// `main` from the compiled `arata.mjs` and invokes it, then bundle that.
 fn bundle_spa() -> Nil {
+  // Bundle size analysis (app.mjs):
+  //   - 115KB minified, 32KB gzipped (reasonable for a Lustre SPA).
+  //   - 134 modules bundled.
+  //   - Main contributors: lustre runtime (vdom, reconciler, virtualise,
+  //     dispatch), gleam_stdlib (CustomType, List, etc.), modem (routing).
+  //   - No simplifile, tom, mork, or mork_to_lustre in the bundle (they
+  //     are build-time only and tree-shaken out).
+  //   - No lustre server runtime or component runtime (not used by the SPA).
+  //   - `bun build --external` does not reduce size (transitive imports
+  //     still pull the modules in).
+  // The bundle is already well-optimized; `--minify` (used below) is the
+  // main lever. No further code changes are needed here.
+
   // Write the entry shim that calls main(). The shim lives alongside
   // arata.mjs in build/dev/javascript/arata/, so the import is relative
   // to that directory: "./arata.mjs".
@@ -385,7 +402,16 @@ fn index_html(site_meta: site.SiteMeta) -> String {
   <title>" <> site_meta.title <> "</title>
   <meta name='description' content='" <> site_meta.description <> "'>
   <link rel='icon' type='image/png' href='./icon/favicon.png'>
-" <> feed_links <> "  <link rel='stylesheet' href='./arata.css'>
+" <> feed_links <> "  <link rel='stylesheet' href='./css/base.css'>
+  <link rel='stylesheet' href='./css/layout.css'>
+  <link rel='stylesheet' href='./css/components.css'>
+  <link rel='stylesheet' href='./css/post.css'>
+  <link rel='stylesheet' href='./css/cards.css'>
+  <link rel='stylesheet' href='./css/links.css'>
+  <link rel='stylesheet' href='./css/search.css'>
+  <link rel='stylesheet' href='./css/toc.css'>
+  <link rel='stylesheet' href='./css/syntax.css'>
+  <link rel='stylesheet' href='./css/accessibility.css'>
 </head>
 <body>
   <div id='app'></div>
