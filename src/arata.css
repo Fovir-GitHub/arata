@@ -1668,8 +1668,16 @@ pre.giallo code {
   -webkit-backdrop-filter: blur(8px);
 }
 
+.search-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  cursor: pointer;
+}
+
 .search-modal #modal-content {
   position: relative;
+  z-index: 1;
   margin: 8% auto;
   width: 80%;
   max-width: 28rem;

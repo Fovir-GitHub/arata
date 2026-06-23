@@ -80,9 +80,9 @@ pub fn default() -> Config {
     logo: None,
     rss_enabled:,
     fonts: Fonts(
-      text: "\"ZedTextFtl\"",
-      header: "\"ZedDisplayFtl\", \"Space Grotesk\", sans-serif",
-      code: "\"Jetbrains Mono\"",
+      text: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+      header: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif",
+      code: "\"SF Mono\", \"Fira Code\", \"JetBrains Mono\", Consolas, \"Liberation Mono\", Menlo, monospace",
     ),
     search_enabled: True,
     analytics: AnalyticsDisabled,

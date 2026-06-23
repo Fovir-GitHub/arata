@@ -70,6 +70,15 @@ pub fn parse_route(uri: Uri) -> Route {
     ["tags"] -> Tags
     ["tags", name] -> Tag(name:)
 
+    // Static files that should not be handled by the SPA router.
+    ["atom.xml"]
+    | ["rss.xml"]
+    | ["sitemap.xml"]
+    | ["content_index.json"]
+    | ["search_index.json"]
+    | ["app.mjs"]
+    | ["arata.css"] -> NotFound(uri:)
+
     // Any other single segment is a standalone page (e.g. /about, /404).
     [slug] -> Page(slug:)
 
