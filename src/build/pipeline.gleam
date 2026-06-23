@@ -388,6 +388,23 @@ fn search_index_json(posts: List(Post)) -> String {
   )
 }
 
+fn inline_css() -> String {
+  css_modules
+  |> list.map(fn(path) {
+    case simplifile.read(path) {
+      Ok(css) -> "/* " <> path <> " */\n" <> sanitize_style_text(css)
+
+      Error(_) -> "/* Warning: could not inline " <> path <> " */"
+    }
+  })
+  |> string.join("\n\n")
+}
+
+fn sanitize_style_text(css: String) -> String {
+  css
+  |> string.replace("</style", "<\\/style")
+}
+
 /// The custom `index.html` with FOUC prevention: both `light` and `dark`
 /// classes on `<html>`, CSS modules loaded in order, and the SPA script.
 ///
@@ -405,6 +422,7 @@ fn index_html(site_meta: site.SiteMeta) -> String {
 "
     False -> ""
   }
+  let css = inline_css()
 
   "<!DOCTYPE html>
 <html lang='en' class='dark light'>
@@ -414,16 +432,9 @@ fn index_html(site_meta: site.SiteMeta) -> String {
   <title>" <> site_meta.title <> "</title>
   <meta name='description' content='" <> site_meta.description <> "'>
   <link rel='icon' type='image/png' href='/icon/favicon.png'>
-" <> feed_links <> "  <link rel='stylesheet' href='/css/base.css'>
-  <link rel='stylesheet' href='/css/layout.css'>
-  <link rel='stylesheet' href='/css/components.css'>
-  <link rel='stylesheet' href='/css/post.css'>
-  <link rel='stylesheet' href='/css/cards.css'>
-  <link rel='stylesheet' href='/css/links.css'>
-  <link rel='stylesheet' href='/css/search.css'>
-  <link rel='stylesheet' href='/css/toc.css'>
-  <link rel='stylesheet' href='/css/syntax.css'>
-  <link rel='stylesheet' href='/css/accessibility.css'>
+" <> feed_links <> " <style id='arata-css'>
+" <> css <> "
+  </style>
 </head>
 <body>
   <div id='app'><div style='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg-0);color:var(--text-1);font-family:sans-serif;'>Loading…</div></div>
