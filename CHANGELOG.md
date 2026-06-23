@@ -5,6 +5,31 @@ All notable changes to arata are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+---
+
+## [v1.1.2] — 2026-06-24
+
+### Added
+
+- Added configurable favicon support.
+  - `Config` now includes a `favicon` field.
+  - `index.html` and `404.html` use the configured favicon during static build generation.
+  - When no favicon is configured, the build falls back to the existing default favicon path.
+
+### Changed
+
+- Moved default `SiteMeta` values into `config.gleam`.
+  - `config.site_meta()` is now the single source for site metadata defaults.
+  - The build pipeline and SPA runtime now read site metadata from configuration instead of `data/site.default()`.
+  - `data/site.gleam` is now focused on shared metadata types.
+
+### Fixed
+
+- Kept `index.html` and `404.html` favicon output consistent by generating both from the same configured value.
+- Reduced configuration drift between `Config` and `SiteMeta` for shared values such as title, description, analytics, comments, and RSS settings.
+
+---
+
 ## [v1.1.1] — 2026-06-23
 
 ### Added
@@ -48,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Verifies equal weights use deterministic lowercase title ordering.
   - Verifies loaded links have valid non-negative weights.
 
+---
+
 ## [v1.1.0] — 2026-06-23
 
 ### Added
@@ -77,9 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated local preview documentation to use `http-server` instead of Python's built-in static server.
 
-  ```sh
+```sh
   nix run nixpkgs#http-server -- -p 8080 dist
-````
+```
 
 - Documented that local preview should use a static server suitable for SPA routes.
   - Python's `python -m http.server --directory dist` does not provide SPA deep-link fallback for routes like `/posts/configuration`.
@@ -124,6 +151,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Build
 
 - Updated the generated arata demo site output.
+
+---
 
 ## [v1.0.0] — 2026-06-23
 
@@ -208,6 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cmd/Ctrl+K conflict**: `preventDefault` added so the shortcut no longer conflicts with the browser address bar's default Cmd/Ctrl+K behaviour.
 - **Code font loading**: code font no longer loads JetBrains Mono via `@font-face`; defaults to the `ui-monospace` system stack.
 - **Search scope**: search previously matched only title/description/tags; it now includes the post body too.
+
+---
 
 ## [0.1.0] — 2026-06-22
 
