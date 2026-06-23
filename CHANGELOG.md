@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Link avatars**: optional `image` field on the `Link` type, rendered as a circular avatar on the links page.
 - **Multi-level table of contents**: the ToC now parses `h2`, `h3`, and `h4` headings from the rendered HTML into a nested tree (previously single-level).
 - **Bundle size analysis**: production bundle measured at 115 KB minified (32 KB gzipped), well-optimised for an SPA of this scope.
+- Config: `mathjax_enabled` flag (default False) to enable/disable MathJax rendering.
+- Optional font support documented: Maple Font and Sarasa Gothic.
+- Post subheadings are now clickable with anchor links (`<a href="#id">`).
+- Search now searches post body content (HTML stripped to plain text).
 
 ### Changed
 
@@ -24,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CSS on-demand loading**: `dist/` now ships 10 separate CSS files under `dist/css/` rather than a single `arata.css`, so each page loads only the styles it needs.
 - **CSS modular split**: source CSS reorganised into 10 modules under `src/css/` mirroring the runtime split.
 - **CJK slugify**: replaced the ASCII allowlist with a punctuation denylist, so non-ASCII characters pass through into slugs.
+- Sticky header navbar (position: sticky, always visible on scroll).
+- Body font-weight increased to 500 for better readability.
+- Theme toggle modernized: circular button with subtle background and smooth transition.
+- Default code font changed to `ui-monospace` system stack.
+- Links page redesigned as cards with border, hover effect, and spacing.
+- Search input auto-focuses when modal opens.
+- Home page content updated with current features.
 
 ### Fixed
 

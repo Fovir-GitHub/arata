@@ -7,12 +7,15 @@ subtitle = "A modern and minimalistic blog theme powered by Gleam and Lustre."
 
 - Light, dark, and auto themes
 - [Projects page](/projects)
-- [Talks page](/talks)
-- MathJax rendering
+- [Links page](/links)
+- MathJax rendering (configurable)
 - [Taxonomies](/tags)
 - Custom homepage
-- Comments
-- Search functionality
+- Comments (Giscus/Utterances)
+- Search functionality (searches title, description, tags, and body content)
+- File-based content model (write `.md` files, not code)
+- CSS modular loading (10 separate stylesheets)
+- Mobile-responsive with hamburger menu
 
 ## Quick Start
 
@@ -21,15 +24,15 @@ subtitle = "A modern and minimalistic blog theme powered by Gleam and Lustre."
 ```shell
 gleam new my-blog --template javascript
 cd my-blog
-gleam add lustre modem
+gleam add lustre modem mork
 ```
 
-2. **Start the dev server:**
+2. **Build the site:**
 
 ```shell
-gleam run -m lustre/dev start
+gleam run -m build/pipeline
 ```
 
-3. **Write content** as markdown (parsed by mork).
+3. **Write content** as markdown files in `content/posts/`, `content/pages/`, `content/links/`, and `content/projects/`.
 
-Checkout all the [options you can configure](/posts/configuration) and the [example posts](/posts).
+Checkout the [configuration guide](/posts/configuration) and the [example posts](/posts).

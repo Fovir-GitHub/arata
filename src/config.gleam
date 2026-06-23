@@ -20,11 +20,14 @@ pub type MenuItem {
   MenuItem(name: String, url: String)
 }
 
-/// Font family configuration. The values are CSS `font-family` declarations
-/// (quoted font names with fallbacks) that override the `--text-font`,
-/// `--header-font`, and `--code-font` CSS custom properties defined in
-/// `arata.css`. They are injected as an inline `<style>` rule on `:root` so
-/// the rest of the stylesheet resolves them via `var(--text-font)` etc.
+/// Font family configuration. The values are CSS `font-family` declarations.
+///
+/// Optional fonts users can install and configure:
+/// - **Maple Font** (https://github.com/subframe7536/maple-font): A programming
+///   font with ligatures. Set `code` to `"\"Maple Mono NF\", \"Maple Mono\", monospace"`.
+/// - **Sarasa Gothic** (https://github.com/be5invis/sarasa-gothic): A CJK-friendly
+///   font. Set `text` to `"\"Sarasa Gothic SC\", sans-serif"` or
+///   `code` to `"\"Sarasa Mono SC\", monospace"`.
 pub type Fonts {
   Fonts(text: String, header: String, code: String)
 }
