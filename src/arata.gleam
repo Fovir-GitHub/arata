@@ -35,6 +35,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
+import gleam/uri
 import lustre
 import lustre/attribute
 import lustre/effect
@@ -62,6 +63,13 @@ import view/toc as toc_view
 /// Number of posts per page on the post list. Fix 6 raised this from 7 to 10
 /// so each page shows more posts before paginating.
 const posts_per_page = 10
+
+/// Read (and clear) the deep-link path stashed in sessionStorage by the
+/// `404.html` redirect shim. Returns `""` when there is no redirect (the
+/// common case: the user landed on `/` directly, or refreshed an SPA-rendered
+/// page). See `ffi/redirect.ffi.mjs`.
+@external(javascript, "../ffi/redirect.ffi.mjs", "get_redirect_path")
+fn get_redirect_path() -> String
 
 /// Boot the Lustre application and mount it onto the `#app` element rendered
 /// by the Lustre HTML tool's generated `index.html`.
@@ -166,6 +174,23 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
   // Kick off the async fetch of `content_index.json`. The result arrives as
   // a `ContentLoaded` message that populates `posts`, `pages`, `homepage`.
   let content_eff = effect.map(content_runtime.load(), content_msg_to_msg)
+  // If we were redirected from a 404 (deep-link refresh on a static host),
+  // `get_redirect_path()` returns the original path; parse it and dispatch
+  // `UserNavigatedTo` so the SPA renders the intended route instead of Home.
+  // This runs after `nav_effect` (modem's listeners are armed in the same
+  // batch) so the dispatched message is processed normally.
+  let redirect_eff =
+    effect.from(fn(dispatch) {
+      let path = get_redirect_path()
+      case path {
+        "" -> Nil
+        _ ->
+          case uri.parse(path) {
+            Ok(uri) -> dispatch(UserNavigatedTo(route.parse_route(uri)))
+            Error(_) -> Nil
+          }
+      }
+    })
   let effects =
     effect.batch([
       nav_effect,
@@ -174,6 +199,7 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       search_keys,
       analytics_eff,
       content_eff,
+      redirect_eff,
     ])
 
   #(model, effects)

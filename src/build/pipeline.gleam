@@ -421,19 +421,31 @@ fn index_html(site_meta: site.SiteMeta) -> String {
 }
 
 /// The 404.html redirect shim: on static hosts that serve 404.html for
-/// unknown paths, this script redirects to the SPA with the original path
-/// preserved (so the client-side router can handle it).
+/// unknown paths, this script stores the intended path in sessionStorage and
+/// bounces to `/` (the SPA root). The SPA's `init` effect reads the stored
+/// path via `get_redirect_path()` (see `ffi/redirect.ffi.mjs`) and navigates
+/// to the intended route, preserving the deep link.
+///
+/// Previous versions redirected to the original path directly, which caused an
+/// infinite loop: the server served 404.html for the path, 404.html redirected
+/// to the same path, the server served 404.html again, etc. Redirecting to `/`
+/// (which the server serves as `index.html`) breaks the loop, and sessionStorage
+/// lets us restore the deep link once the SPA is loaded.
 fn not_found_html() -> String {
   "<!DOCTYPE html>
 <html>
 <head>
   <meta charset='UTF-8'>
   <script>
-    // Redirect to the SPA, preserving the path so the client router can
-    // handle it. This is the standard pattern for SPA deep-linking on
-    // GitHub/Cloudflare Pages.
+    // Store the intended deep-link path so the SPA can navigate to it after
+    // loading, then redirect to the SPA root. sessionStorage is scoped to the
+    // tab and cleared once read, so it survives the top-level navigation to `/`
+    // without persisting across sessions.
     var path = window.location.pathname;
-    window.location.href = path;
+    if (path && path !== '/') {
+      try { sessionStorage.setItem('arata-redirect', path); } catch (e) {}
+    }
+    window.location.href = '/';
   </script>
 </head>
 <body>

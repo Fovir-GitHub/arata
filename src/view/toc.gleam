@@ -65,14 +65,27 @@ fn view_entry(entry: TocEntry, active_heading: Option(String)) -> Element(msg) {
   )
 }
 
-/// Render a second-level entry (an h3 inside an h2). Second-level entries only
-/// get `.selected`, never `.parent` (apollo's CSS targets `.toc .parent > a`
-/// for the top-level highlight).
+/// Render a second-level entry (an h3 inside an h2), and — if it has children
+/// — its nested third-level entries (h4 inside h3) as a recursive `<ul>`.
+///
+/// Second-level entries only get `.selected`, never `.parent` (apollo's CSS
+/// targets `.toc .parent > a` for the top-level highlight). The recursion lets
+/// h4 headings render as children of their preceding h3; previously they were
+/// extracted into the `TocEntry` tree by the loader but never emitted as HTML,
+/// so any h4 in a post silently dropped out of the ToC.
 fn view_child(entry: TocEntry, active_heading: Option(String)) -> Element(msg) {
   let is_selected = is_active(entry.id, active_heading)
-  html.li([attribute.classes([#("selected", is_selected)])], [
-    html.a([attribute.href("#" <> entry.id)], [html.text(entry.title)]),
-  ])
+  let link = html.a([attribute.href("#" <> entry.id)], [html.text(entry.title)])
+  let children = case entry.children {
+    [] -> []
+    _ -> [
+      html.ul(
+        [],
+        list.map(entry.children, fn(child) { view_child(child, active_heading) }),
+      ),
+    ]
+  }
+  html.li([attribute.classes([#("selected", is_selected)])], [link, ..children])
 }
 
 fn is_active(id: String, active_heading: Option(String)) -> Bool {
