@@ -81,7 +81,7 @@ pub fn view_items(posts: List(Post)) -> Element(msg) {
 /// `.title` span are siblings. The `.post-content` div below carries the
 /// description.
 fn view_list_item(post: Post) -> Element(msg) {
-  html.li([attribute.class("list-item")], [
+  html.li([attribute.class("list-item post-card")], [
     html.div([attribute.class("post-header")], [
       html.span([attribute.class("meta")], [
         html.time([attribute.datetime(post.date)], [html.text(post.date)]),

@@ -393,14 +393,18 @@ fn search_index_json(posts: List(Post)) -> String {
 /// the SPA script. The theme FFI toggles the `disabled` attribute at runtime.
 ///
 /// Feed `<link rel='alternate'>` tags are only emitted when
-/// `site_meta.rss_enabled` is `True`; the URLs are relative (`./atom.xml`,
-/// `./rss.xml`) so the page works when served from a subdirectory rather than
-/// the domain root.
+/// `site_meta.rss_enabled` is `True`.
+///
+/// All asset paths are absolute (`/app.mjs`, `/css/...`, `/icon/...`) rather
+/// than relative (`./app.mjs`). On a deep link like `/posts/markdown`, the
+/// static host serves 404.html (which is this same HTML), and a relative
+/// `./app.mjs` would resolve to `/posts/app.mjs` — a 404 that breaks the SPA.
+/// Absolute paths resolve correctly regardless of the URL path.
 fn index_html(site_meta: site.SiteMeta) -> String {
   let feed_links = case site_meta.rss_enabled {
     True ->
-      "  <link rel='alternate' type='application/atom+xml' href='./atom.xml'>
-  <link rel='alternate' type='application/rss+xml' href='./rss.xml'>
+      "  <link rel='alternate' type='application/atom+xml' href='/atom.xml'>
+  <link rel='alternate' type='application/rss+xml' href='/rss.xml'>
 "
     False -> ""
   }
@@ -411,21 +415,21 @@ fn index_html(site_meta: site.SiteMeta) -> String {
   <meta name='viewport' content='width=device-width, initial-scale=1.0'>
   <title>" <> site_meta.title <> "</title>
   <meta name='description' content='" <> site_meta.description <> "'>
-  <link rel='icon' type='image/png' href='./icon/favicon.png'>
-" <> feed_links <> "  <link rel='stylesheet' href='./css/base.css'>
-  <link rel='stylesheet' href='./css/layout.css'>
-  <link rel='stylesheet' href='./css/components.css'>
-  <link rel='stylesheet' href='./css/post.css'>
-  <link rel='stylesheet' href='./css/cards.css'>
-  <link rel='stylesheet' href='./css/links.css'>
-  <link rel='stylesheet' href='./css/search.css'>
-  <link rel='stylesheet' href='./css/toc.css'>
-  <link rel='stylesheet' href='./css/syntax.css'>
-  <link rel='stylesheet' href='./css/accessibility.css'>
+  <link rel='icon' type='image/png' href='/icon/favicon.png'>
+" <> feed_links <> "  <link rel='stylesheet' href='/css/base.css'>
+  <link rel='stylesheet' href='/css/layout.css'>
+  <link rel='stylesheet' href='/css/components.css'>
+  <link rel='stylesheet' href='/css/post.css'>
+  <link rel='stylesheet' href='/css/cards.css'>
+  <link rel='stylesheet' href='/css/links.css'>
+  <link rel='stylesheet' href='/css/search.css'>
+  <link rel='stylesheet' href='/css/toc.css'>
+  <link rel='stylesheet' href='/css/syntax.css'>
+  <link rel='stylesheet' href='/css/accessibility.css'>
 </head>
 <body>
   <div id='app'></div>
-  <script type='module' src='./app.mjs'></script>
+  <script type='module' src='/app.mjs'></script>
 </body>
 </html>"
 }

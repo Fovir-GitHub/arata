@@ -52,6 +52,27 @@
   list-style-type: none;
 }
 
+/* Post title: bold so it stands out from the description below (Fix 2). */
+.post-list .post-header .title,
+.tag-list .post-header .title {
+  font-weight: 700;
+}
+
+/* Post card: each list-item wrapped as a bordered card with hover affordance
+   (Fix 3). The border + radius + shadow lift each entry off the page so the
+   list reads as discrete cards rather than a flat list. */
+.post-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.post-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 .post-list .post-header,
 .tag-list .post-header {
   display: flex;
