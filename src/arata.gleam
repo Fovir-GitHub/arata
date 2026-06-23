@@ -103,6 +103,9 @@ pub type Model {
     /// the hamburger button itself is hidden on desktop via CSS, so this flag
     /// has no visible effect above the breakpoint).
     mobile_menu_open: Bool,
+    /// Whether the mobile floating ToC overlay is open (only relevant below
+    /// 992px on a post page; the FAB that toggles it is hidden on desktop).
+    toc_overlay_open: Bool,
   )
 }
 
@@ -152,6 +155,7 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
         selected_index: 0,
       ),
       mobile_menu_open: False,
+      toc_overlay_open: False,
     )
 
   // Initialise modem so internal `<a>` clicks are intercepted and dispatched
@@ -238,6 +242,9 @@ pub type Msg {
   /// The user clicked the mobile hamburger menu button (toggles the
   /// dropdown nav menu below 992px).
   UserToggledMobileMenu
+  /// The user clicked the mobile floating ToC button (toggles the
+  /// bottom-sheet ToC overlay on post pages below 992px).
+  UserToggledTocOverlay
   /// The user submitted the page-jump input on the post list (Enter or
   /// blur). The string is the raw input value; the update parses it to an
   /// `Int` and navigates to `Posts(n)`.
@@ -257,6 +264,7 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
           route:,
           active_heading: option.None,
           mobile_menu_open: False,
+          toc_overlay_open: False,
         )
       #(
         model,
@@ -382,6 +390,7 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
           search: closed_search(),
           active_heading: option.None,
           mobile_menu_open: False,
+          toc_overlay_open: False,
         ),
         effect.batch([
           modem.push(route.href_url(target_route), option.None, option.None),
@@ -397,6 +406,10 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       Model(..model, mobile_menu_open: !model.mobile_menu_open),
       effect.none(),
     )
+    UserToggledTocOverlay -> #(
+      Model(..model, toc_overlay_open: !model.toc_overlay_open),
+      effect.none(),
+    )
     // PAGE JUMP ------------------------------------------------------------
     UserEnteredPageJump(page_str) ->
       // Parse the input value and navigate to `Posts(n)`. Invalid input
@@ -406,7 +419,12 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
         Ok(page) if page >= 1 -> {
           let target_route = route.Posts(page)
           #(
-            Model(..model, route: target_route, mobile_menu_open: False),
+            Model(
+              ..model,
+              route: target_route,
+              mobile_menu_open: False,
+              toc_overlay_open: False,
+            ),
             effect.batch([
               modem.push(route.href_url(target_route), option.None, option.None),
               post_effects_for(
@@ -650,9 +668,53 @@ fn view(model: Model) -> Element(Msg) {
         <> model.config.fonts.code
         <> "; }",
     )
+  // On a single post with TOC entries, render a floating action button (FAB)
+  // in the bottom-right corner that opens a bottom-sheet ToC overlay. Both
+  // are hidden on desktop via CSS (only visible below 992px), so emitting
+  // them on every platform is harmless — the media query gates visibility.
+  let toc_fab_els = case model.route {
+    Post(slug) ->
+      case post.find_by_slug(model.posts, slug) {
+        Ok(found) ->
+          case found.toc {
+            [] -> []
+            _ -> [
+              html.button(
+                [
+                  attribute.class("toc-fab"),
+                  attribute.attribute("aria-label", "Open table of contents"),
+                  event.on_click(UserToggledTocOverlay),
+                ],
+                [html.text("☰")],
+              ),
+              ..case model.toc_overlay_open {
+                True -> [
+                  html.div(
+                    [
+                      attribute.class("toc-overlay"),
+                      event.on_click(UserToggledTocOverlay),
+                    ],
+                    [
+                      html.div([attribute.class("toc-overlay-content")], [
+                        html.div([attribute.class("heading")], [
+                          html.text("Table of Contents"),
+                        ]),
+                        toc_view.view(found.toc, model.active_heading),
+                      ]),
+                    ],
+                  ),
+                ]
+                False -> []
+              }
+            ]
+          }
+        Error(Nil) -> []
+      }
+    _ -> []
+  }
   html.div(
     [],
-    list.append(
+    list.flatten([
       [
         layout.view(
           list.append([fonts_style], [
@@ -670,7 +732,8 @@ fn view(model: Model) -> Element(Msg) {
         ),
       ],
       [search_modal_el],
-    ),
+      toc_fab_els,
+    ]),
   )
 }
 

@@ -858,7 +858,8 @@ screens.
 
 - Search now includes the post body (HTML stripped to plain text), not just
   title/description/tags.
-- Results show a context snippet (30 chars before/after the match).
+- Results show a context snippet (80 chars before/after the match) so the
+  reader gets more surrounding context for a hit.
 - The search input auto-focuses when the modal opens.
 
 ### ToC multi-level with CJK support
@@ -866,7 +867,8 @@ screens.
 The table of contents now parses `h2`, `h3`, and `h4` headings into a nested
 tree (previously single-level). CJK heading IDs use a punctuation-denylist
 slugify with a sequential fallback (`heading-1`, `heading-2`, …) for non-ASCII
-slugs.
+slugs. The `view_child` renderer is now recursive, so `h4` headings under an
+`h3` actually appear in the ToC instead of being silently dropped.
 
 ### Links page with avatars
 
@@ -882,8 +884,10 @@ bundled web fonts (system font stacks), and tree-shaking of unused Lustre APIs.
 
 ### Theme toggle modernized
 
-The theme toggle is now a circular button with `var(--primary-color)` (#3555b3)
-background and white SVG icons, replacing the previous text-based toggle.
+The theme toggle is now a plain icon button with an opacity hover, replacing
+the earlier oval-background variant. The moon/auto icons are hidden by default
+(`display: none`) so only the active icon shows, eliminating the triple-icon
+flash on first paint.
 
 ### Post headings clickable with anchor links
 
@@ -894,6 +898,43 @@ click to copy/share a deep link to a section.
 
 The pagination bar now includes a page-jump input — type a page number and
 press Enter to navigate directly to that page.
+
+### Redirect loop fix (sessionStorage deep-link restore)
+
+Static hosts that serve `index.html` for every path used to cause a refresh
+loop on deep links: refreshing `/posts/foo` served `404.html`, which redirected
+to `/#/posts/foo`, which the SPA re-parsed as a navigation, ad infinitum. Now
+`404.html` stores the requested path in `sessionStorage` and redirects to `/`
+cleanly; the SPA reads the stashed path on init and dispatches a single
+`UserNavigatedTo`, so deep-link refreshes load the right post once.
+
+### Mobile floating ToC button
+
+Below 992px the sidebar ToC is hidden (the layout collapses to one column). A
+floating action button (`☰`) now appears in the bottom-right corner on post
+pages with TOC entries; tapping it opens a bottom-sheet overlay that
+re-renders the same `.toc` tree, so mobile readers can still jump between
+sections. The overlay closes on a backdrop tap.
+
+### CJK word count
+
+The post meta word-count now counts multi-byte characters (e.g. CJK
+ideographs) as individual words instead of treating a whole run as a single
+word, so the displayed count is meaningful for non-Latin content.
+
+### RSS path fix
+
+Social-link RSS icons used to 404 on sub-pages because they pointed at a
+relative URL. They now use the absolute `/atom.xml` path with `target=_blank`,
+so the feed resolves on every route.
+
+### Body text color and font-weight adjustments
+
+Body font-weight reverted to 400 (normal) for a softer reading experience, and
+the body text colour is now semi-transparent (`#F0F0F0DE` in dark, `#151515DE`
+in light) to reduce harsh contrast. Post content uses 400-weight body text —
+distinct from the 700-weight title — so headings stand out without the body
+feeling heavy. HR separators use `#6c7086` for a subtler rule.
 
 ---
 

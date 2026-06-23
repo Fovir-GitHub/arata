@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional font support documented: Maple Font and Sarasa Gothic.
 - Post subheadings are now clickable with anchor links (`<a href="#id">`).
 - Search now searches post body content (HTML stripped to plain text).
-- **Search snippets**: search results show a context snippet (30 chars before/after the match).
+- **Search snippets**: search results show a context snippet (80 chars before/after the match).
 - **Page jump input**: type a page number in the pagination bar and press Enter to jump straight to that page.
+- **Mobile floating ToC button**: a bottom-right FAB on post pages (below 992px) opens a bottom-sheet overlay with the table of contents, so readers on small screens can still navigate the post outline.
 
 ### Changed
 
@@ -31,8 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CSS modular split**: source CSS reorganised into 10 modules under `src/css/` mirroring the runtime split.
 - **CJK slugify**: replaced the ASCII allowlist with a punctuation denylist, so non-ASCII characters pass through into slugs.
 - Sticky header navbar (position: sticky, always visible on scroll).
-- Body font-weight increased to 600 for better readability.
-- Theme toggle modernized: circular button with `var(--primary-color)` (#3555b3) background and white SVG icons.
+- Body font-weight reverted to 400 (normal) for a softer reading experience.
+- Body text color: semi-transparent (`#F0F0F0DE` in dark, `#151515DE` in light) for less harsh contrast.
+- Post content font-weight: 400 (distinct from the 700-weight title).
+- Theme toggle: removed oval background; now a plain icon button with opacity hover.
 - Default code font: `ui-monospace` system stack (no longer loads JetBrains Mono `@font-face`).
 - Links page redesigned as cards with border, hover effect, and spacing.
 - Search input auto-focuses when modal opens.
@@ -45,10 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Post page refresh infinite redirect**: `404.html` now stores the requested path in `sessionStorage` and redirects to `/`; the SPA restores the path on init and navigates to the intended route, so deep-link refreshes load the right post.
+- **ToC h4 headings**: `view_child` was not rendering children recursively, so any `h4` in a post silently dropped out of the ToC; the renderer now recurses so h2–h4 all appear.
+- **RSS icon 404 on sub-pages**: social links now use the absolute `/atom.xml` URL with `target=_blank`, so the feed icon resolves on every route.
+- **CJK word count**: multi-byte characters (e.g. CJK ideographs) are now counted as individual words instead of being merged into a single run.
+- **Theme toggle icon flash**: moon/auto icons are now hidden by default (`display: none`), eliminating the triple-icon flash on first paint.
 - **RSS/static file routing**: `/atom.xml`, `/rss.xml`, and `/sitemap.xml` are now matched before the `[slug]` catch-all, so feeds and the sitemap are served correctly.
 - **CJK heading IDs**: when a heading's slug is non-ASCII, a sequential fallback ID (`heading-1`, `heading-2`, …) is used so anchor links stay functional.
 - **Links page layout**: `.link-item a` is now a flexbox row with proper avatar sizing and alignment.
-- **Post page refresh**: no longer redirects to `/#/posts/<slug>`; `404.html` now uses a clean-path redirect so deep links load the right post.
 - **ToC rendering**: `extract_toc_from_html` parsing bug fixed — heading IDs and titles are now extracted properly, so the ToC renders instead of being empty.
 - **Cmd/Ctrl+K conflict**: `preventDefault` added so the shortcut no longer conflicts with the browser address bar's default Cmd/Ctrl+K behaviour.
 - **Code font loading**: code font no longer loads JetBrains Mono via `@font-face`; defaults to the `ui-monospace` system stack.
