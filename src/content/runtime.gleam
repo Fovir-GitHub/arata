@@ -4,17 +4,28 @@
 //// that the build pipeline generates from the `.md` files.
 ////
 //// This module is browser-safe: it uses `rsvp` (HTTP fetch) to load the JSON
-//// at startup. If the fetch fails (e.g. during development without a build
-//// step), it falls back to empty content.
+//// at startup.
+////
+//// Important invariant:
+//// Runtime decoding should be tolerant of older generated JSON where possible.
+//// For friend links, `weight` defaults to 999 so older `content_index.json`
+//// files still decode, while newer builds get deterministic Zola-style
+//// ordering.
 
 import data/link.{type Link, Link}
 import data/page.{type Page, Page}
 import data/post.{type Post, type TocEntry, Post, TocEntry}
 import data/project.{type Project, Project}
 import gleam/dynamic/decode
+import gleam/int
+import gleam/list
 import gleam/option
+import gleam/order.{type Order, Eq}
+import gleam/string
 import lustre/effect.{type Effect}
 import rsvp
+
+const default_link_weight = 999
 
 /// All content loaded from `content_index.json`.
 pub type Content {
@@ -49,7 +60,28 @@ fn decode_content_index() -> decode.Decoder(Content) {
   use homepage <- decode.field("homepage", decode_page())
   use links <- decode.field("links", decode.list(decode_link()))
   use projects <- decode.field("projects", decode.list(decode_project()))
-  decode.success(Content(posts:, pages:, homepage:, links:, projects:))
+
+  let ordered_links = sort_links(links)
+
+  decode.success(Content(
+    posts: posts,
+    pages: pages,
+    homepage: homepage,
+    links: ordered_links,
+    projects: projects,
+  ))
+}
+
+fn sort_links(links: List(Link)) -> List(Link) {
+  list.sort(links, compare_links)
+}
+
+fn compare_links(a: Link, b: Link) -> Order {
+  case int.compare(a.weight, b.weight) {
+    Eq -> string.compare(string.lowercase(a.title), string.lowercase(b.title))
+
+    ordering -> ordering
+  }
 }
 
 fn decode_post() -> decode.Decoder(Post) {
@@ -73,6 +105,7 @@ fn decode_post() -> decode.Decoder(Post) {
   )
   use word_count <- decode.field("word_count", decode.int)
   use reading_time <- decode.field("reading_time", decode.int)
+
   decode.success(Post(
     slug: slug,
     title: title,
@@ -98,6 +131,7 @@ fn decode_page() -> decode.Decoder(Page) {
     option.None,
     decode.optional(decode.string),
   )
+
   decode.success(Page(slug: slug, title: title, body: body, subtitle: subtitle))
 }
 
@@ -109,6 +143,7 @@ fn decode_toc_entry() -> decode.Decoder(TocEntry) {
     [],
     decode.list(decode_toc_entry()),
   )
+
   decode.success(TocEntry(id: id, title: title, children: children))
 }
 
@@ -121,11 +156,14 @@ fn decode_link() -> decode.Decoder(Link) {
     option.None,
     decode.optional(decode.string),
   )
+  use weight <- decode.optional_field("weight", default_link_weight, decode.int)
+
   decode.success(Link(
     title: title,
     url: url,
     description: description,
     image: image,
+    weight: weight,
   ))
 }
 
@@ -169,6 +207,7 @@ fn decode_project() -> decode.Decoder(Project) {
     decode.optional(decode.string),
   )
   use tags <- decode.optional_field("tags", [], decode.list(decode.string))
+
   decode.success(Project(
     slug: slug,
     title: title,

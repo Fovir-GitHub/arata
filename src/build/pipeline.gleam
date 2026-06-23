@@ -300,6 +300,7 @@ fn content_index_json(
         #("url", json.string(link.url)),
         #("description", json.string(link.description)),
         #("image", option_to_json(link.image)),
+        #("weight", json.int(link.weight)),
       ])
     })
 

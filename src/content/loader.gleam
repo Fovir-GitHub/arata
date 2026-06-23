@@ -17,10 +17,13 @@ import data/project.{type Project, Project}
 import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/order.{Eq}
 import gleam/result
 import gleam/string
 import simplifile
 import tom
+
+const default_link_weight = 999
 
 /// Load all posts from `content/posts/`. Each `.md` file becomes a `Post`.
 /// Posts are sorted by date descending (newest first).
@@ -61,9 +64,16 @@ pub fn load_homepage() -> Page {
 
 /// Load all friend links from `content/links/*.md`.
 ///
-/// Links have no markdown body — just frontmatter (`title`, `url`,
-/// `description`). The list is sorted alphabetically by title for a stable
-/// display order regardless of filesystem listing order.
+/// Ordering follows Zola's `weight` convention:
+///
+///   - lower `weight` appears earlier
+///   - links without `weight` default to `999`
+///   - equal weights fall back to title ordering for deterministic output
+///
+/// Supported frontmatter shapes:
+///
+///   - arata-native: `url`, `image`
+///   - Zola-style: `[extra] link_to`, `[extra] remote_image`
 pub fn load_links() -> List(Link) {
   let dir = "content/links"
   case simplifile.read_directory(at: dir) {
@@ -72,8 +82,15 @@ pub fn load_links() -> List(Link) {
       |> list.filter(fn(name) { string.ends_with(name, ".md") })
       |> list.map(fn(name) { load_link(dir <> "/" <> name) })
       |> list.filter_map(fn(r) { r })
-      |> list.sort(by: fn(a, b) { string.compare(a.title, b.title) })
+      |> list.sort(by: compare_links)
     Error(_) -> []
+  }
+}
+
+fn compare_links(a: Link, b: Link) -> order.Order {
+  case int.compare(a.weight, b.weight) {
+    Eq -> string.compare(string.lowercase(a.title), string.lowercase(b.title))
+    ordering -> ordering
   }
 }
 
@@ -83,14 +100,32 @@ fn load_link(path: String) -> Result(Link, Nil) {
   )
   let #(frontmatter, _body) = split_frontmatter(content)
   use toml <- result.try(tom.parse(frontmatter) |> result.replace_error(Nil))
+
   let title = tom.get_string(toml, ["title"]) |> result.unwrap("")
-  let url = tom.get_string(toml, ["url"]) |> result.unwrap("")
   let description = tom.get_string(toml, ["description"]) |> result.unwrap("")
-  let image = case tom.get_string(toml, ["image"]) {
-    Ok(s) -> Some(s)
-    Error(_) -> None
-  }
-  Ok(Link(title: title, url: url, description: description, image: image))
+
+  let url =
+    tom.get_string(toml, ["url"])
+    |> result.or(tom.get_string(toml, ["extra", "link_to"]))
+    |> result.unwrap("")
+
+  let image =
+    tom.get_string(toml, ["image"])
+    |> result.or(tom.get_string(toml, ["extra", "remote_image"]))
+    |> result.map(Some)
+    |> result.unwrap(None)
+
+  let weight =
+    tom.get_int(toml, ["weight"])
+    |> result.unwrap(default_link_weight)
+
+  Ok(Link(
+    title: title,
+    url: url,
+    description: description,
+    image: image,
+    weight: weight,
+  ))
 }
 
 /// Load all projects from `content/projects/*.md`.
@@ -270,13 +305,7 @@ fn split_frontmatter(content: String) -> #(String, String) {
 /// heading tag (N = 2, 3, 4) mork emitted and `add_heading_ids` stamped with an
 /// `id`, then builds a nested `TocEntry` tree: h2 entries sit at the top level,
 /// h3 entries nest under the preceding h2, and h4 entries nest under the
-/// preceding h3. Reading the `id` straight from the rendered HTML guarantees
-/// the TOC's `#id` anchors resolve to the right heading — no risk of the
-/// slugify algorithm drifting out of sync between TOC extraction and ID
-/// injection. CJK headings, which slugify leaves untouched and which would
-/// otherwise produce IDs that browsers can't match against percent-encoded
-/// fragment links, fall back to sequential `heading-N` IDs (assigned by
-/// `add_heading_ids`), and we just read those back here.
+/// preceding h3.
 fn extract_toc_from_html(html: String) -> List(TocEntry) {
   let all_headings = parse_headings(html)
   let toc_headings =
@@ -287,10 +316,7 @@ fn extract_toc_from_html(html: String) -> List(TocEntry) {
   build_toc_tree(toc_headings)
 }
 
-/// Parse `<hN id="...">Title</hN>` tags out of rendered HTML. Returns a flat
-/// list of `(level, id, title)` triples in document order. Non-heading pieces
-/// produced by splitting on `<h` (e.g. `<hr />`'s `r />...`, `<header>`'s
-/// `eader>...`) fail the level-digit or `id="` lookups and are dropped.
+/// Parse `<hN id="...">Title</hN>` tags out of rendered HTML.
 fn parse_headings(html: String) -> List(#(Int, String, String)) {
   html
   |> string.split("<h")
@@ -313,9 +339,7 @@ fn parse_headings(html: String) -> List(#(Int, String, String)) {
 }
 
 /// Build a nested `TocEntry` tree from a flat list of `(level, id, title)`
-/// triples. Headings at the minimum level present become top-level entries;
-/// each heading's children are the consecutive deeper-level headings that
-/// follow it, up to the next heading at the same or shallower level.
+/// triples.
 fn build_toc_tree(headings: List(#(Int, String, String))) -> List(TocEntry) {
   case headings {
     [] -> []
@@ -326,10 +350,7 @@ fn build_toc_tree(headings: List(#(Int, String, String))) -> List(TocEntry) {
   }
 }
 
-/// Process `headings` at `level`, returning a list of `TocEntry`. Each entry
-/// at `level` consumes the following deeper-level headings as its children
-/// (recursively built via `build_at_level` at the child's level), stopping at
-/// the next heading at `level` or shallower.
+/// Process `headings` at `level`, returning a list of `TocEntry`.
 fn build_at_level(
   headings: List(#(Int, String, String)),
   level: Int,
@@ -346,16 +367,12 @@ fn build_at_level(
       let entry = TocEntry(id: id, title: title, children: children)
       [entry, ..build_at_level(siblings, level)]
     }
-    // A shallower heading ends this level (its parent will handle it);
-    // a deeper heading with no preceding peer at this level is skipped.
     [#(lvl, _, _), ..] if lvl < level -> []
     [_, ..rest] -> build_at_level(rest, level)
   }
 }
 
-/// Split `headings` at the first entry whose level is `<= level`, returning
-/// the deeper-level run (children) and the remainder (siblings). Used by
-/// `build_at_level` to carve out a heading's subtree.
+/// Split `headings` at the first entry whose level is `<= level`.
 fn take_until_at_or_below(
   headings: List(#(Int, String, String)),
   level: Int,
@@ -370,17 +387,7 @@ fn take_until_at_or_below(
   }
 }
 
-/// First pass of heading-id generation: lowercase the text, convert
-/// spaces/dashes/underscores to `-`, and drop common punctuation
-/// (`. , : ? ! ( ) ' "`). Every other grapheme — including CJK characters,
-/// letters, and numbers — is kept verbatim. The result is then handed to
-/// `needs_fallback_id`: if it's empty, all hyphens, or contains any non-ASCII
-/// character (e.g. `## 简介` → `简介`), `add_heading_ids` discards it and
-/// substitutes a sequential `heading-N` id instead. Bare CJK ids would
-/// otherwise break TOC navigation — browsers percent-encode the `#fragment`
-/// of a `#简介` link to `#%E7%AE%80%E4%BB%8B…`, which then fails to match an
-/// `id="简介"` attribute — so we fall back to ASCII-only ids that always agree
-/// between the `id` attribute and the TOC's `#id` anchor.
+/// First pass of heading-id generation.
 fn slugify(text: String) -> String {
   text
   |> string.lowercase()
@@ -394,10 +401,7 @@ fn slugify(text: String) -> String {
   })
 }
 
-/// Strip HTML tags from a fragment of HTML by dropping everything between
-/// `<` and `>` (inclusive). Used by `add_heading_ids` to extract plain text
-/// from heading content that mork may have wrapped in inline tags like
-/// `<code>` or `<a>`. HTML entities (e.g. `&lt;`) are left untouched.
+/// Strip HTML tags from a fragment of HTML.
 fn strip_html_tags(html: String) -> String {
   html
   |> string.split("<")
@@ -410,24 +414,7 @@ fn strip_html_tags(html: String) -> String {
   |> string.join("")
 }
 
-/// Post-process mork's HTML output to inject `id` attributes on `<h1>`–`<h6>`
-/// heading tags. mork only emits `id`s when its `heading_ids` option is
-/// enabled (and arata leaves it off), so we add them ourselves at load time.
-/// The id is the slugified plain-text content of the heading (after stripping
-/// any nested inline tags). Headings whose slug is empty, all hyphens, or
-/// contains non-ASCII characters (e.g. CJK titles like `## 简介`) get a
-/// sequential fallback id `heading-1`, `heading-2`, … instead — see
-/// `slugify` for why. `extract_toc_from_html` reads the ids back off the
-/// rendered HTML, so TOC anchors always match.
-///
-/// The parser is intentionally simple: it splits the HTML on `<h`, then for
-/// each piece starting with `1>`–`6>` (i.e. an `<hN>` opening tag with no
-/// attributes — mork's default output), it extracts the heading text up to
-/// the matching `</h`, slugifies the stripped text, and rebuilds the tag as
-/// `<hN id="slug">…</hN>`. Pieces that don't start with a heading level
-/// (e.g. `<header>`, `<hr />`) are left untouched. A running counter tracks
-/// the next sequential fallback number; it only advances when a fallback id
-/// is actually assigned.
+/// Post-process mork's HTML output to inject `id` attributes on `<h1>`–`<h6>`.
 fn add_heading_ids(html: String) -> String {
   let pieces = string.split(html, "<h")
   case pieces {
@@ -445,17 +432,7 @@ fn add_heading_ids(html: String) -> String {
   }
 }
 
-/// Process one piece produced by splitting HTML on `<h`. A heading piece
-/// looks like `2>Title</h2>\n…`; a non-heading piece (e.g. from `<header>`)
-/// looks like `eader>…</header>…`. We only rewrite the former, returning
-/// `#(rewritten_piece, next_counter)`. `next_counter` is the next sequential
-/// fallback number to hand to the following heading — it advances by one only
-/// when this heading needed a fallback id (`heading-{counter}`); otherwise it
-/// stays put so the ASCII slugs don't burn numbers.
-///
-/// The heading's title text is also wrapped in an `<a href="#{final_id}">` so
-/// clicking it scrolls to the heading's own anchor — matching the ToC links'
-/// `#id` same-page-scroll behaviour.
+/// Process one piece produced by splitting HTML on `<h`.
 fn add_id_to_heading_piece(piece: String, counter: Int) -> #(String, Int) {
   let levels = ["1>", "2>", "3>", "4>", "5>", "6>"]
   let is_heading = list.any(levels, fn(lv) { string.starts_with(piece, lv) })
@@ -492,9 +469,6 @@ fn add_id_to_heading_piece(piece: String, counter: Int) -> #(String, Int) {
 }
 
 /// Whether a slugified heading needs the sequential `heading-N` fallback.
-/// True when the slug is empty, all hyphens, or contains any character outside
-/// ASCII lowercase letters, digits, and hyphens (e.g. CJK graphemes, which
-/// `slugify` leaves verbatim).
 fn needs_fallback_id(slug: String) -> Bool {
   case slug {
     "" -> True
@@ -508,8 +482,7 @@ fn needs_fallback_id(slug: String) -> Bool {
   }
 }
 
-/// Whether a grapheme is an ASCII lowercase letter, digit, or hyphen — the
-/// only characters a browser-safe URL fragment slug should contain.
+/// Whether a grapheme is an ASCII lowercase letter, digit, or hyphen.
 fn is_ascii_slug_char(ch: String) -> Bool {
   case ch {
     "a"
@@ -553,29 +526,7 @@ fn is_ascii_slug_char(ch: String) -> Bool {
   }
 }
 
-/// Count words in a markdown string (rough estimate).
-///
-/// Fix 10: handle CJK text. The previous implementation just split on spaces,
-/// which meant a paragraph of Chinese/Japanese/Korean text (no inter-word
-/// spaces) counted as a single "word" — turning a 500-character essay into a
-/// 1-word post with `reading_time = 0`. The new algorithm walks the markdown
-/// grapheme-by-grapheme and counts:
-///
-///   - each whitespace char (` `, `\n`, `\t`) as a word *boundary* (ends the
-///     current ASCII word without adding to the count),
-///   - each multi-byte grapheme (CJK ideographs, hiragana, katakana, hangul,
-///     and as a harmless side effect accented Latin and emoji) as **one word**,
-///   - each run of ASCII chars (letters, digits, punctuation) as **one word**,
-///     counted at the moment the run starts.
-///
-/// Code blocks (lines starting with ```` ``` ````) are skipped before
-/// counting, matching the previous behaviour.
-///
-/// Examples:
-///   `"hello world"`  → 2  (hello, world)
-///   `"hello 世界"`    → 3  (hello, 世, 界)
-///   `"你好世界"`       → 4  (你, 好, 世, 界)
-///   `"hello世界"`     → 3  (hello, 世, 界)
+/// Count words in a markdown string.
 fn count_words(markdown: String) -> Int {
   let text =
     markdown
@@ -590,12 +541,7 @@ fn count_words(markdown: String) -> Int {
         " " | "\n" | "\t" -> #(count, False)
         _ ->
           case string.byte_size(ch) > 1 {
-            // Multi-byte grapheme (CJK / accented Latin / emoji): counts as
-            // its own word and ends any in-progress ASCII run so the next
-            // ASCII char starts a fresh word.
             True -> #(count + 1, False)
-            // ASCII grapheme: if we're mid-word it's part of the current
-            // word (no increment); otherwise it begins a new word (+1).
             False ->
               case in_word {
                 True -> #(count, True)
