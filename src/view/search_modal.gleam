@@ -142,7 +142,10 @@ fn view_result(
     ],
     [
       html.span([], [html.text(post.title)]),
-      html.span([], [html.text(post.description)]),
+      // Fix 9a: show the context snippet (where the query matched in the
+      // body) instead of the static description, so the user can see why
+      // this post matched.
+      html.span([], [html.text(result.snippet)]),
     ],
   )
 }

@@ -15,7 +15,10 @@
 }
 blockquote {
   border-left: 3px solid var(--primary-color);
-  color: #737373;
+  /* Fix 10: lifted the blockquote text color from the muted #737373 to a
+     brighter #BAC2DE so quoted text reads as part of the page rather than
+     fading into the background. */
+  color: #bac2de;
   margin: 0;
   padding-left: 1em;
 }

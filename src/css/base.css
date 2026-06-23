@@ -53,23 +53,13 @@
  */
 /* =========================================================================
    1. @font-face declarations  (from sass/fonts.scss)
+      Fix 9b: the "Jetbrains Mono" @font-face blocks were removed — the CSS
+      variables `--mono-text-font` and `--code-font` now default to a system
+      monospace stack (`ui-monospace`, Cascadia Code, Source Code Pro, Menlo,
+      Consolas) and the inline <style> override in arata.gleam swaps in the
+      configured `config.fonts.code` family. The TTF files are still on disk
+      under `static/fonts/JetbrainsMono/` but no longer loaded by the browser.
    ------------------------------------------------------------------------- */
-
-@font-face {
-  font-family: "Jetbrains Mono";
-  font-style: normal;
-  font-weight: 400;
-  src: url("/fonts/JetbrainsMono/JetBrainsMono-Regular.ttf") format("truetype");
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Jetbrains Mono";
-  font-style: normal;
-  font-weight: 700;
-  src: url("/fonts/JetbrainsMono/JetBrainsMono-Bold.ttf") format("truetype");
-  font-display: swap;
-}
 
 @font-face {
   font-family: "Space Grotesk";
@@ -119,10 +109,15 @@
 :root {
   /* Fonts */
   --font-size-base: 17px;
-  --mono-text-font: "Jetbrains Mono";
+  /* Fix 9b: default the monospace families to the system stack so the
+     browser uses the OS's native monospace (e.g. SF Mono on macOS, Cascadia
+     Code on Windows) instead of loading the bundled JetBrains Mono TTFs.
+     The inline <style> override in arata.gleam swaps in `config.fonts.code`
+     when configured. */
+  --mono-text-font: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
   --text-font: "ZedTextFtl";
   --header-font: "ZedDisplayFtl", "Space Grotesk", "Helvetica", sans-serif;
-  --code-font: "Jetbrains Mono", monospace;
+  --code-font: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 
   /* Layout & type scale */
   --line-height: 1.5;
@@ -189,11 +184,11 @@ html {
   color: var(--text-0);
   font-family: var(--text-font);
   line-height: var(--line-height);
-  /* Fix 8 — body text font-weight: bump from the default 400 (normal) to
-     500 (medium) so the body text reads slightly heavier, matching the
-     visual density of modern system-UI web text. Headings and bold spans
-     override this via their own font-weight rules. */
-  font-weight: 500;
+  /* Fix 8 — body text font-weight: bumped from 400 (default) to 500, then
+     raised again to 600 (semi-bold) so the body text reads clearly heavy,
+     matching the visual density of modern system-UI web text. Headings and
+     bold spans override this via their own font-weight rules. */
+  font-weight: 600;
 }
 
 @media (max-width: 992px) {
@@ -273,7 +268,9 @@ h6::before {
 }
 
 hr {
-  color: var(--border-color);
+  /* Fix 10: explicit separator color (#6c7086) so horizontal rules read as
+     deliberate dividers rather than relying on the muted border-color. */
+  color: #6c7086;
   background: none;
   margin: 1.2rem auto;
 }

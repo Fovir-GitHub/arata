@@ -7,19 +7,27 @@
 //// into the bundle. The search index is built from the in-memory post list at
 //// runtime (no build-time index emission needed until the markdown pipeline
 //// lands in Phase 17).
+////
+//// Fix 9a: each `SearchResult` now carries a context `snippet` showing where
+//// the query matched in the post body (30 characters before and after the
+//// match, with ellipses). When the match is in the title/tags (not the body),
+//// the snippet falls back to the post's description.
 
 import data/post.{type Post}
+import gleam/int
 import gleam/list
 import gleam/string
 
 /// One search result: the post and a snippet of where the query matched.
 pub type SearchResult {
-  SearchResult(post: Post)
+  SearchResult(post: Post, snippet: String)
 }
 
 /// Search `posts` for `query`. Returns matching posts sorted by relevance
 /// (title matches first, then description, then tags). An empty query returns
-/// an empty list. Matching is case-insensitive.
+/// an empty list. Matching is case-insensitive. Fix 9a: each result carries
+/// a context `snippet` showing ~30 chars before and after the first body
+/// match (falling back to the description when the match isn't in the body).
 pub fn search(posts: List(Post), query: String) -> List(SearchResult) {
   case query {
     "" -> []
@@ -27,7 +35,9 @@ pub fn search(posts: List(Post), query: String) -> List(SearchResult) {
       let q = string.lowercase(query)
       posts
       |> list.filter(fn(post) { matches(post, q) })
-      |> list.map(fn(post) { SearchResult(post:) })
+      |> list.map(fn(post) {
+        SearchResult(post:, snippet: extract_snippet(post, q))
+      })
     }
   }
 }
@@ -48,6 +58,42 @@ fn matches(post: Post, query: String) -> Bool {
   || string.contains(desc, query)
   || string.contains(tags, query)
   || string.contains(body, query)
+}
+
+/// Build a context snippet for the first occurrence of `query` (already
+/// lowercased by the caller) in the post. We try the body first; if the
+/// query doesn't appear in the stripped body, we fall back to the post's
+/// description so the result row always has some text to display.
+fn extract_snippet(post: Post, query: String) -> String {
+  let body = string.lowercase(strip_html(post.body))
+  case string.split_once(body, query) {
+    Ok(#(before, after)) -> {
+      let before_snippet = take_last(before, 30)
+      let after_snippet = take_first(after, 30)
+      "..." <> before_snippet <> query <> after_snippet <> "..."
+    }
+    Error(_) -> post.description
+  }
+}
+
+/// Take the first `n` graphemes from a string. Grapheme-based (not byte- or
+/// codepoint-based) so multi-byte characters (CJK, emoji) are kept intact.
+fn take_first(s: String, n: Int) -> String {
+  s
+  |> string.to_graphemes
+  |> list.take(n)
+  |> string.concat
+}
+
+/// Take the last `n` graphemes from a string. Grapheme-based for the same
+/// reason as `take_first`.
+fn take_last(s: String, n: Int) -> String {
+  let graphemes = string.to_graphemes(s)
+  let len = list.length(graphemes)
+  let drop_count = int.max(0, len - n)
+  graphemes
+  |> list.drop(drop_count)
+  |> string.concat
 }
 
 /// Strip HTML tags from a string by dropping everything between `<` and `>`

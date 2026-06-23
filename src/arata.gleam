@@ -59,10 +59,9 @@ import view/toc as toc_view
 
 // MAIN ------------------------------------------------------------------------
 
-/// Number of posts per page on the post list. With 5 sample posts and a page
-/// size of 7 (matching apollo's `content/posts/_index.md` paginate_by), all
-/// posts fit on page 1.
-const posts_per_page = 7
+/// Number of posts per page on the post list. Fix 6 raised this from 7 to 10
+/// so each page shows more posts before paginating.
+const posts_per_page = 10
 
 /// Boot the Lustre application and mount it onto the `#app` element rendered
 /// by the Lustre HTML tool's generated `index.html`.
@@ -213,6 +212,10 @@ pub type Msg {
   /// The user clicked the mobile hamburger menu button (toggles the
   /// dropdown nav menu below 992px).
   UserToggledMobileMenu
+  /// The user submitted the page-jump input on the post list (Enter or
+  /// blur). The string is the raw input value; the update parses it to an
+  /// `Int` and navigates to `Posts(n)`.
+  UserEnteredPageJump(page: String)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
@@ -368,6 +371,28 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       Model(..model, mobile_menu_open: !model.mobile_menu_open),
       effect.none(),
     )
+    // PAGE JUMP ------------------------------------------------------------
+    UserEnteredPageJump(page_str) ->
+      // Parse the input value and navigate to `Posts(n)`. Invalid input
+      // (non-numeric, < 1) is silently ignored — the user just stays on the
+      // current page.
+      case int.parse(page_str) {
+        Ok(page) if page >= 1 -> {
+          let target_route = route.Posts(page)
+          #(
+            Model(..model, route: target_route, mobile_menu_open: False),
+            effect.batch([
+              modem.push(route.href_url(target_route), option.None, option.None),
+              post_effects_for(
+                target_route,
+                is_effective_dark(model.theme, model.system_prefers_dark),
+                model.config.mathjax_enabled,
+              ),
+            ]),
+          )
+        }
+        _ -> #(model, effect.none())
+      }
   }
 }
 
@@ -533,7 +558,10 @@ fn handle_search_key(
 fn view(model: Model) -> Element(Msg) {
   let #(main_content, right_content) = case model.route {
     Home -> #(home_view.view(model.homepage), none())
-    Posts(page) -> #(post_list.view(model.posts, page, posts_per_page), none())
+    Posts(page) -> #(
+      post_list.view(model.posts, page, posts_per_page, UserEnteredPageJump),
+      none(),
+    )
     Post(slug) ->
       case post.find_by_slug(model.posts, slug) {
         Ok(found) -> #(
