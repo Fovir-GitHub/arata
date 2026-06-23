@@ -1,6 +1,6 @@
 +++
 title = "Shortcode Reference"
-date = "2026-01-03"
+date = "2026-06-22"
 description = "Reference for the note, character, image, and mermaid shortcodes available in arata posts."
 tags = ["docs", "shortcodes"]
 +++

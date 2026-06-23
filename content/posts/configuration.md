@@ -1,6 +1,7 @@
 +++
 title = "Configuration"
-date = "2026-01-01"
+date = "2026-06-22"
+updated = "2022-06-23"
 description = "Comprehensive configuration guide for arata."
 tags = ["guide", "config"]
 +++

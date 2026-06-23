@@ -1,6 +1,6 @@
 +++
 title = "Content Authoring"
-date = "2026-01-02"
+date = "2026-06-22"
 description = "How to author posts, projects, talks, and pages as markdown with TOML frontmatter."
 tags = ["docs", "content"]
 +++
