@@ -414,14 +414,31 @@ Used by:
 * robots.txt
 * llms.txt
 * absolute canonical resource links
+* deriving `Config.base_path` for non-root deployments
 
-Do not include a trailing slash unless your deployment path requires it.
-The build helpers normalize trailing slashes where needed.
+`base_url` should describe the final public URL where the site is deployed.
+arata derives the runtime `base_path` from this value so the SPA can work both
+at the domain root and under a subdirectory.
 
-Example:
+For root-domain deployments:
 
 ```gleam
 base_url: "https://blog.example.com"
+````
+
+This derives:
+
+```gleam
+base_path: ""
+```
+
+and runtime assets resolve like:
+
+```txt
+/app.mjs
+/content_index.json
+/rss.xml
+/icons/search.svg
 ```
 
 For subdirectory deployments:
@@ -429,6 +446,81 @@ For subdirectory deployments:
 ```gleam
 base_url: "https://example.com/blog"
 ```
+
+This derives:
+
+```gleam
+base_path: "/blog"
+```
+
+and runtime assets resolve like:
+
+```txt
+/blog/app.mjs
+/blog/content_index.json
+/blog/rss.xml
+/blog/icons/search.svg
+```
+
+For GitHub Pages project sites, use the repository path:
+
+```gleam
+base_url: "https://yonzilch.github.io/arata"
+```
+
+This derives:
+
+```gleam
+base_path: "/arata"
+```
+
+and fixes project-site deployments where root-absolute requests such as:
+
+```txt
+/app.mjs
+/content_index.json
+/rss.xml
+/icons/social/rss.svg
+```
+
+would otherwise incorrectly resolve from the domain root instead of the
+repository subdirectory.
+
+Do not include a trailing slash unless your deployment path requires it.
+The config helpers normalize trailing slashes where needed, so these are
+equivalent:
+
+```gleam
+base_url: "https://example.com/blog"
+```
+
+```gleam
+base_url: "https://example.com/blog/"
+```
+
+Both derive:
+
+```gleam
+base_path: "/blog"
+```
+
+Keep `Config` paths as logical root-relative paths:
+
+```gleam
+favicon: Some("/images/favicon.ico")
+Social(name: "RSS", url: "/rss.xml", icon: "rss")
+```
+
+Do not pre-prefix them manually:
+
+```gleam
+favicon: Some("/blog/images/favicon.ico")  # avoid
+Social(name: "RSS", url: "/blog/rss.xml", icon: "rss")  # avoid
+```
+
+arata applies `base_path` at the output layer when generating HTML, fetching
+`content_index.json`, resolving header icons/social links, and producing SPA
+route hrefs.
 
 ### `title` and `description`
 
