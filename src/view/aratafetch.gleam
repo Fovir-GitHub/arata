@@ -32,7 +32,6 @@ pub type Stats {
     tag_count: Int,
     link_count: Int,
     project_count: Int,
-    comment_count: Option(Int),
     maintain_for: Option(String),
   )
 }
@@ -47,14 +46,11 @@ pub type Stats {
 ///   Some("2 years")
 ///   None
 ///
-/// `comment_count` is optional because Giscus/Utterances do not expose a
-/// static local count in arata's current data model.
 pub fn from_content(
   site_title: String,
   posts: List(Post),
   links: List(Link),
   projects: List(Project),
-  comment_count: Option(Int),
   maintain_for: Option(String),
 ) -> Stats {
   let published_posts = list.filter(posts, fn(post) { !post.draft })
@@ -66,7 +62,6 @@ pub fn from_content(
     tag_count: unique_tag_count(published_posts),
     link_count: list.length(links),
     project_count: list.length(projects),
-    comment_count: comment_count,
     maintain_for: maintain_for,
   )
 }
@@ -119,7 +114,6 @@ fn render(stats: Stats) -> String {
       "    /_/    \\_\\    " <> row("links", int.to_string(stats.link_count)),
       "                  "
         <> row("projects", int.to_string(stats.project_count)),
-      "                  " <> row("comments", optional_int(stats.comment_count)),
       "                  " <> row("maintain", optional_text(stats.maintain_for)),
     ],
     "\n",
@@ -128,14 +122,6 @@ fn render(stats: Stats) -> String {
 
 fn row(label: String, value: String) -> String {
   label <> repeat(" ", int.max(1, 11 - string.length(label))) <> value
-}
-
-fn optional_int(value: Option(Int)) -> String {
-  case value {
-    Some(n) -> int.to_string(n)
-
-    None -> "n/a"
-  }
 }
 
 fn optional_text(value: Option(String)) -> String {

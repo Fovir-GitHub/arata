@@ -646,7 +646,6 @@ fn view_route_content(model: Model) -> #(Element(Msg), Element(Msg)) {
           model.posts,
           model.links,
           model.projects,
-          option.None,
           model.config.aratafetch_maintain_for,
         )
 
