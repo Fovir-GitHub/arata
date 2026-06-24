@@ -725,15 +725,33 @@ pre.giallo code {
 }
 
 /* Clipboard copy button — bottom-right of <pre> */
-.clipboard-button,
-.clipboard-button svg {
+.clipboard-button {
     all: unset;
+    box-sizing: border-box;
     cursor: pointer;
     position: absolute;
     bottom: 5px;
     right: 5px;
     z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    color: var(--text-color);
     background-color: transparent;
     border: none;
-    fill: var(--text-color);
+    opacity: 0.8;
+}
+
+.clipboard-button:hover {
+    opacity: 1;
+}
+
+.clipboard-button svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    pointer-events: none;
 }
