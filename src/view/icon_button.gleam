@@ -1,47 +1,35 @@
-//// Reusable icon-button link, mirroring apollo's
-//// `macros/components.html::icon_button` macro.
+//// Icon button component for external links.
 ////
-//// Renders as an `<a class="icon-button">` containing an `<img>` (loaded from
-//// `/icons/{icon_path}{icon}.svg`) followed by the supplied text. External
-//// links open in a new tab with `rel="noopener"` to match apollo's default.
-////
-//// `icon_path` defaults to `"social/"` (resolving to `/icons/social/…`) for
-//// social links; pass `"../"` for UI icons (`calendar`, `map-pin`,
-//// `presentation`, `code`) which live directly under `/icons/`.
+//// Used by project cards for GitHub/GitLab/Codeberg/Forgejo/Demo links.
+//// Icon assets are resolved through Config.base_path so non-root deployments
+//// such as GitHub Pages project sites do not request `/icons/...` from the
+//// domain root.
 
+import config
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/html
 
-/// Render an icon-button link.
-///
-/// `icon` is the filename (without extension) of an SVG. `icon_path` is the
-/// path prefix under `/icons/`: `"social/"` for social icons (the default),
-/// or `"../"` for UI icons that live at `/icons/{icon}.svg` directly.
-pub fn view(href: String, text: String, icon: String) -> Element(msg) {
-  view_with_path(href, text, icon, "social/")
-}
+pub fn view(url: String, label: String, icon: String) -> Element(msg) {
+  let site_config = config.default()
 
-/// Render an icon-button link with a custom icon path prefix.
-pub fn view_with_path(
-  href: String,
-  text: String,
-  icon: String,
-  icon_path: String,
-) -> Element(msg) {
   html.a(
     [
       attribute.class("icon-button"),
-      attribute.href(href),
+      attribute.href(url),
       attribute.target("_blank"),
       attribute.rel("noopener"),
+      attribute.attribute("aria-label", label),
+      attribute.title(label),
     ],
     [
       html.img([
-        attribute.src("/icons/" <> icon_path <> icon <> ".svg"),
-        attribute.alt(icon),
+        attribute.alt(label),
+        attribute.src(config.with_base_path(
+          site_config.base_path,
+          "/icons/social/" <> icon <> ".svg",
+        )),
       ]),
-      html.text(text),
     ],
   )
 }

@@ -19,6 +19,7 @@ import gleam/option.{type Option}
 import lustre/attribute
 import lustre/element.{type Element, none}
 import lustre/element/html
+import route
 import view/icon_button
 
 /// Render a single project card.
@@ -51,7 +52,8 @@ fn view_media(image: Option(String), alt: String) -> Element(msg) {
 }
 
 /// The card title as a link. External `link_to` opens in a new tab; otherwise
-/// the title links to the internal project page `/{slug}` via modem.
+/// the title links to the internal project page through the typed router so
+/// non-root deployments keep the configured base path.
 fn view_title(project: Project) -> Element(msg) {
   case project.link_to {
     option.Some(url) ->
@@ -65,7 +67,7 @@ fn view_title(project: Project) -> Element(msg) {
       )
 
     option.None ->
-      html.a([attribute.href("/" <> project.slug)], [
+      html.a([route.href(route.Page(project.slug))], [
         html.text(project.title),
       ])
   }
