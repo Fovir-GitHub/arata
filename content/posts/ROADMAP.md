@@ -1,4 +1,12 @@
-# arata — ROADMAP
++++
+title = "ROADMAP"
+date = "2026-06-21"
+updated = "2026-06-24"
+description = "Comprehensive ROADMAP of arata project"
+tags = ["docs"]
++++
+
+# Arata — ROADMAP
 
 > A faithful reimplementation of the [apollo](https://github.com/not-matthias/apollo)
 > blog theme, built with [Gleam](https://gleam.run) and the
@@ -9,10 +17,6 @@ complete reproduction of apollo. It is organised as a phased roadmap: each phase
 has a goal, the apollo source it mirrors, the files it touches, concrete steps,
 and acceptance criteria. Phases are ordered so that each one produces a
 runnable, reviewable increment.
-
-The research underpinning this roadmap lives in
-`apollo/RESEARCH_NOTES.md` and
-`lustre/RESEARCH_NOTES.md` (produced during scaffolding).
 
 ---
 
@@ -30,6 +34,7 @@ The research underpinning this roadmap lives in
 10. [Version pins & dependencies](#10-version-pins--dependencies)
 11. [Definition of done](#11-definition-of-done)
 12. [References](#12-references)
+13. [Follow-up Notes](#13-follow-up-notes)
 
 ---
 
@@ -50,8 +55,6 @@ inside arata.
 - A build pipeline that replaces Zola: markdown → HTML, frontmatter parsing,
   syntax highlighting, image resizing, search-index emission, feed/sitemap
   emission, minification.
-- The **wavy section boundary** the project author called out. This is **not**
-  present in apollo and is designed fresh for arata (see Phase 16).
 
 ### 1.3 Out of scope
 - apollo's Playwright visual-regression test suite, Lighthouse CI, Nix/Docker
@@ -131,7 +134,7 @@ src/
 │   ├── talk.gleam            # Talk type + decoder
 │   └── content.gleam         # ContentTree: all posts/projects/talks/tags/pages
 ├── view/
-│   ├── layout.gleam          # shell: header + main + footer + wavy boundary
+│   ├── layout.gleam          # shell: header + main + footer
 │   ├── header.gleam          # nav: logo/title, menu, socials, search, toggle
 │   ├── footer.gleam          # socials, copyright
 │   ├── toc.gleam             # table of contents + active-highlight
@@ -260,7 +263,6 @@ implementation. "Phase" refers to §7.
 | Sitemap | `build/feeds.gleam` emits `sitemap.xml` | 17 |
 | Image format defaults (avif/webp, quality) | `build/image.gleam` | 17 |
 | Lazy loading images | `<img loading="lazy" decoding="async">` in shortcodes | 13 |
-| **Wavy section boundary (NEW — not in apollo)** | SVG `<path>` between sections, `fill: var(--bg-1)`; see Phase 16 | 16 |
 
 ---
 
@@ -743,31 +745,7 @@ changes; mermaid re-themes on toggle.
 **Acceptance:** per-page comments load; analytics fire; view-source shows
 correct meta; feeds and sitemap validate.
 
-### Phase 16 — The wavy section boundary (NEW) ✅ DONE
-**Goal:** a soft, wavy boundary between two sections of the site — a feature
-apollo does **not** have, designed fresh for arata.
-
-**Files:** `src/view/wavy_boundary.gleam`, additions to `src/arata.css`.
-
-**Steps:**
-1. Design an SVG divider: `<svg viewBox="0 0 1440 80"
-   preserveAspectRatio="none"><path d="…"/></svg>` with a gentle sine-like curve.
-2. Theme it with `fill: var(--bg-1)` (blends with the section below) and a
-   `var(--bg-0)`-coloured counterpart above, so it reads as a boundary in both
-   light and dark.
-3. `wavy_boundary.view(above_bg, below_bg) -> Element(msg)` returns the SVG,
-   parameterised so any two sections can use it.
-4. Insert it between major sections (e.g. homepage hero → post list, footer →
-   content) per the author's preference.
-5. Keep it cheap: `preserveAspectRatio="none"` lets it stretch; no JS, no
-   animation (honour apollo's "no animation" ethos, or add one optional subtle
-   one gated by a config flag).
-6. Verify it doesn't overlap the sticky footer and respects safe-area insets.
-
-**Acceptance:** a visible soft wavy divider renders between the chosen sections
-in both themes and at all breakpoints.
-
-### Phase 17 — Static-site generation / build pipeline ✅ DONE
+### Phase 16 — Static-site generation / build pipeline ✅ DONE
 **Goal:** replace Zola end-to-end: `content/` → `dist/` with a hydratable SPA,
 search index, feeds, sitemap, minified assets.
 
@@ -791,7 +769,7 @@ template.
 **Acceptance:** `gleam run -m arata/build` produces a `dist/` that, served
 statically, behaves identically to `zola build` on the same content.
 
-### Phase 18 — Polish, accessibility, responsive, tests ✅ DONE
+### Phase 17 — Polish, accessibility, responsive, tests ✅ DONE
 **Goal:** production quality.
 
 **Steps:**
@@ -808,7 +786,7 @@ statically, behaves identically to `zola build` on the same content.
 **Acceptance:** no axe/lighthouse critical issues; all breakpoints match apollo;
 test suite green.
 
-### Phase 19 — Release & docs ✅ DONE
+### Phase 18 — Release & docs ✅ DONE
 **Steps:**
 1. Write a `docs/` guide (config reference, content authoring, shortcode
    reference, deployment).
@@ -1140,11 +1118,15 @@ arata is "done" when **all** of the following hold:
 
 - apollo source: `https://github.com/not-matthias/apollo` (cloned to
   `apollo/`).
-- apollo research notes: `apollo/RESEARCH_NOTES.md`.
 - Lustre source: `https://github.com/lustre-labs/lustre` (cloned to
   `lustre/`).
-- Lustre research notes: `lustre/RESEARCH_NOTES.md`.
 - Lustre docs: `https://hexdocs.pm/lustre`.
 - Key example: `lustre/examples/04-applications/01-routing` (the arata skeleton).
 - modem docs: `https://hexdocs.pm/modem`.
 - Gleam docs: `https://gleam.run`.
+
+## 13. Follow-up Notes
+
+Following the release of v1.0.0, the ROADMAP has fulfilled its purpose. 
+
+Please refer to CHANGELOG for subsequent versions.

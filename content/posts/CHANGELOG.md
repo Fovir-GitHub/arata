@@ -1,4 +1,12 @@
-# Changelog
++++
+title = "CHANGELOG"
+date = "2026-06-21"
+updated = "2026-06-24"
+description = "Comprehensive CHANGELOG of arata project"
+tags = ["docs"]
++++
+
+# Arata — CHANGELOG
 
 All notable changes to arata are documented in this file.
 
@@ -6,6 +14,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [v1.2.0] — 2026-06-24
+
+### Added
+
+- Added `aratafetch` homepage summary to documentation and homepage.
+  - Documented configuration (`aratafetch_enabled`, `aratafetch_maintained_for`).
+  - Simplified homepage (`content/pages/home.md`) with a minimal design and concise onboarding.
+
+### Changed
+
+- Updated README.
+  - Reflected GFM-enabled Markdown rendering.
+  - Documented aratafetch feature.
+  - Updated build, CSS, and project layout descriptions.
+
+- Simplified homepage content.
+  - Reduced verbosity and removed scaffold-heavy instructions.
+  - Replaced Quick Start with minimal build + serve workflow.
+  - Emphasized file-based content authoring and core entry points.
+
+### Fixed
+
+- Fixed Markdown table rendering.
+  - Enabled GFM table parsing via `mork.parse_with_options`.
+  - Markdown tables now correctly render as `<table>` instead of plain text.
+
+- Fixed code block enhancement timing.
+  - Ensured clipboard button and language label appear on initial post navigation.
+  - Added DOM-ready scheduling and mutation observation to handle SPA render timing.
+
+### Notes
+
+- This release stabilizes two core primitives:
+  - **Markdown correctness** (GFM parity with expected authoring behavior)
+  - **Post-render enhancement timing** (FFI reliability under SPA routing)
+
+These fixes remove two major sources of user-visible inconsistency in authored content and post rendering.
 
 ## [v1.1.3] — 2026-06-24
 
@@ -16,13 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Controlled by `Config.aratafetch_enabled`.
   - Supports an optional `Config.aratafetch_maintained_for` display string for the `maintained` row.
   - Summarizes loaded runtime content:
-    - site title
-    - published post count
-    - total word count
-    - unique tag count
-    - friend link count
-    - project count
-    - optional maintenance string
+
+  1. site title
+  2. published post count
+  3. total word count
+  4. unique tag count
+  5. friend link count
+  6. project count
+  7. optional maintenance string
 
 ### Changed
 
