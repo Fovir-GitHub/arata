@@ -15,4 +15,4 @@ apollo is a beautiful, minimalistic theme for the Zola static site generator. ar
 - **modem** — client-side routing over the History API.
 - **mork** — a pure-Gleam CommonMark + GFM markdown parser.
 
-See the [posts](/posts) for deep dives into the implementation, or the [projects page](/projects) for related work.
+See the [posts](posts) for deep dives into the implementation, or the [projects page](projects) for related work.

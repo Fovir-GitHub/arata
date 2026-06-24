@@ -7,10 +7,10 @@ subtitle = "Welcome to demo site of arata"
 
 ## Features
 
-- [Links page](/links)
-- [About page](/about)
-- [Taxonomies](/tags)
-- [Projects page](/projects)
+- [Links page](links)
+- [About page](about)
+- [Taxonomies](tags)
+- [Projects page](projects)
 - Table of Contents
 - Remarkable performance
 - Comments (Giscus/Utterances)
@@ -18,10 +18,10 @@ subtitle = "Welcome to demo site of arata"
 - Mobile-responsive with hamburger menu
 - Custom homepage (Just you're looking at)
 - CSS modular loading (10 separate stylesheets)
-- Light, dark, and auto themes, swithing by one botton
+- Light, dark, and auto themes, switching by one botton
 - File-based content model (write `.md` files, parser at building)
 - Search functionality (title, description, tags, and body content)
-- More features ✨ you could explore by your self
+- More features ✨ you could explore by yourself
 
 ## Quick Start
 
@@ -54,7 +54,7 @@ content/projects/
 
 5. **Configure and publish your site**
 
-Checkout the [configuration guide](/posts/configuration) and the [deployment guide](/posts/deployment).
+Checkout the [configuration guide](posts/configuration) and the [deployment guide](posts/deployment).
 
 ---
 
