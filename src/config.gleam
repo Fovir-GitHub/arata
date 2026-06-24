@@ -13,6 +13,7 @@ import data/site.{
 }
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 
 pub type Social {
   Social(name: String, url: String, icon: String)
@@ -38,6 +39,14 @@ pub type Config {
   Config(
     title: String,
     description: String,
+    /// Base path for subdirectory deployments.
+    ///
+    /// Use "" for root deployments:
+    ///   https://example.com/
+    ///
+    /// Use "/arata" for GitHub Pages project deployments:
+    ///   https://yonzilch.github.io/arata/
+    base_path: String,
     menu: List(MenuItem),
     socials: List(Social),
     /// Optional logo path (relative to `/`). When `None`, the site title is
@@ -82,14 +91,16 @@ pub type Config {
     /// Whether to show the aratafetch ASCII summary on the homepage.
     /// When `False`, the homepage behaves exactly as before.
     aratafetch_enabled: Bool,
-    aratafetch_maintain_for: Option(String),
+    /// Optional display string for aratafetch's "maintained" row.
+    /// Example: Some("since 2026-06-21")
+    aratafetch_maintained_for: Option(String),
   )
 }
 
 /// Hardcoded default site metadata used by the build pipeline and SPA runtime.
 pub fn site_meta() -> SiteMeta {
   SiteMeta(
-    base_url: "https://arata.example.com",
+    base_url: "https://yonzilch.github.io/arata",
     title: "Arata",
     description: "Arata is a modern and minimalistic blog theme powered by Gleam and Lustre.",
     analytics: AnalyticsDisabled,
@@ -102,16 +113,19 @@ pub fn site_meta() -> SiteMeta {
 /// Hardcoded default config. Replaced by JSON loading in Phase 4.
 pub fn default() -> Config {
   let meta = site_meta()
-  let rss_enabled = True
+  let base_path = base_path_from_url(meta.base_url)
+  let rss_enabled = meta.rss_enabled
+
   Config(
     title: meta.title,
     description: meta.description,
+    base_path: base_path,
     menu: [
-      MenuItem(name: "posts", url: "/posts"),
-      MenuItem(name: "projects", url: "/projects"),
-      MenuItem(name: "links", url: "/links"),
-      MenuItem(name: "tags", url: "/tags"),
-      MenuItem(name: "about", url: "/about"),
+      MenuItem(name: "posts", url: with_base_path(base_path, "/posts")),
+      MenuItem(name: "projects", url: with_base_path(base_path, "/projects")),
+      MenuItem(name: "links", url: with_base_path(base_path, "/links")),
+      MenuItem(name: "tags", url: with_base_path(base_path, "/tags")),
+      MenuItem(name: "about", url: with_base_path(base_path, "/about")),
     ],
     // The RSS social link is only added when `rss_enabled` is `True`. Fix
     // 9b/10: the URL is absolute (`/atom.xml`) so it resolves correctly on
@@ -142,7 +156,7 @@ pub fn default() -> Config {
     sidebar_enabled: True,
     floating_buttons_enabled: True,
     aratafetch_enabled: True,
-    aratafetch_maintain_for: Some("since 2026-06-21"),
+    aratafetch_maintained_for: Some("since 2026-06-21"),
   )
 }
 
@@ -155,6 +169,7 @@ fn default_socials(rss_enabled: Bool) -> List(Social) {
     True -> [Social(name: "RSS", url: "/rss.xml", icon: "rss")]
     False -> []
   }
+
   list.append(rss, [
     Social(
       name: "Codeberg",
@@ -167,4 +182,100 @@ fn default_socials(rss_enabled: Bool) -> List(Social) {
       icon: "github",
     ),
   ])
+}
+
+/// Derive a deployment base path from `SiteMeta.base_url`.
+///
+/// Examples:
+///   https://example.com        -> ""
+///   https://example.com/       -> ""
+///   https://user.github.io/arata -> "/arata"
+///
+/// This keeps GitHub Pages project deployments working without hardcoding
+/// root-absolute asset URLs like `/app.mjs`.
+pub fn base_path_from_url(url: String) -> String {
+  let cleaned =
+    url
+    |> string.trim
+    |> trim_trailing_slashes
+
+  case string.split_once(cleaned, "://") {
+    Ok(#(_scheme, rest)) -> base_path_from_host_and_path(rest)
+
+    Error(_) -> normalize_base_path(cleaned)
+  }
+}
+
+fn base_path_from_host_and_path(rest: String) -> String {
+  case string.split_once(rest, "/") {
+    Ok(#(_host, path)) -> normalize_base_path("/" <> path)
+
+    Error(_) -> ""
+  }
+}
+
+/// Normalize a deployment base path.
+///
+/// Examples:
+///   ""        -> ""
+///   "/"       -> ""
+///   "arata"   -> "/arata"
+///   "/arata/" -> "/arata"
+pub fn normalize_base_path(path: String) -> String {
+  path
+  |> string.trim
+  |> ensure_leading_slash
+  |> trim_trailing_slashes
+  |> normalize_root_path
+}
+
+/// Prefix a root-relative site path with a deployment base path.
+///
+/// Examples:
+///   with_base_path("", "/app.mjs")       -> "/app.mjs"
+///   with_base_path("/arata", "/app.mjs") -> "/arata/app.mjs"
+///   with_base_path("/arata", "/")        -> "/arata/"
+pub fn with_base_path(base_path: String, path: String) -> String {
+  let base_path = normalize_base_path(base_path)
+
+  case base_path, path {
+    "", _ -> ensure_leading_slash(path)
+
+    _, "/" -> base_path <> "/"
+
+    _, _ -> base_path <> ensure_leading_slash(path)
+  }
+}
+
+fn ensure_leading_slash(path: String) -> String {
+  case path {
+    "" -> ""
+
+    _ ->
+      case string.starts_with(path, "/") {
+        True -> path
+        False -> "/" <> path
+      }
+  }
+}
+
+fn trim_trailing_slashes(path: String) -> String {
+  case string.ends_with(path, "/") {
+    True -> {
+      let size = string.length(path)
+
+      path
+      |> string.slice(0, size - 1)
+      |> trim_trailing_slashes
+    }
+
+    False -> path
+  }
+}
+
+fn normalize_root_path(path: String) -> String {
+  case path {
+    "/" -> ""
+    _ -> path
+  }
 }

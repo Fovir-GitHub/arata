@@ -262,11 +262,13 @@ fn content_index_json(
   pages: List(Page),
   homepage: Page,
 ) -> String {
+  let site_config = config.default()
   let config_obj =
     json.object([
       #("title", json.string(site_meta.title)),
       #("description", json.string(site_meta.description)),
       #("base_url", json.string(site_meta.base_url)),
+      #("base_path", json.string(site_config.base_path)),
     ])
 
   let posts_arr =
@@ -385,7 +387,13 @@ fn search_index_json(posts: List(Post)) -> String {
         #("title", json.string(post.title)),
         #("description", json.string(post.description)),
         #("tags", json.string(string.join(post.tags, " "))),
-        #("url", json.string("/posts/" <> post.slug)),
+        #(
+          "url",
+          json.string(config.with_base_path(
+            config.default().base_path,
+            "/posts/" <> post.slug,
+          )),
+        ),
       ])
     }),
   )
@@ -418,18 +426,32 @@ fn sanitize_style_text(css: String) -> String {
 /// than relative (`./app.mjs`). On a deep link like `/posts/markdown`, the
 /// static host serves 404.html, and relative assets would resolve incorrectly.
 fn index_html(site_meta: site.SiteMeta, site_config: config.Config) -> String {
+  let base_path = site_config.base_path
+
+  let atom_href = config.with_base_path(base_path, "/atom.xml")
+  let rss_href = config.with_base_path(base_path, "/rss.xml")
+  let app_src = config.with_base_path(base_path, "/app.mjs")
+
+  let favicon = case site_config.favicon {
+    option.Some(path) -> config.with_base_path(base_path, path)
+
+    option.None -> config.with_base_path(base_path, "/icon/favicon.png")
+  }
+
   let feed_links = case site_meta.rss_enabled {
     True ->
-      "  <link rel='alternate' type='application/atom+xml' href='/atom.xml'>
-  <link rel='alternate' type='application/rss+xml' href='/rss.xml'>
+      "  <link rel='alternate' type='application/atom+xml' href='"
+      <> atom_href
+      <> "'>
+  <link rel='alternate' type='application/rss+xml' href='"
+      <> rss_href
+      <> "'>
 "
+
     False -> ""
   }
+
   let css = inline_css()
-  let favicon = case site_config.favicon {
-    option.Some(path) -> path
-    option.None -> "/icon/favicon.png"
-  }
 
   "<!DOCTYPE html>
 <html lang='en' class='dark light'>
@@ -439,13 +461,13 @@ fn index_html(site_meta: site.SiteMeta, site_config: config.Config) -> String {
   <title>" <> site_meta.title <> "</title>
   <meta name='description' content='" <> site_meta.description <> "'>
   <link rel='icon' href='" <> favicon <> "'>
-" <> feed_links <> " <style id='arata-css'>
+" <> feed_links <> "  <style id='arata-css'>
 " <> css <> "
   </style>
 </head>
 <body>
   <div id='app'><div style='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg-0);color:var(--text-1);font-family:sans-serif;'>Loading…</div></div>
-  <script type='module' src='/app.mjs'></script>
+  <script type='module' src='" <> app_src <> "'></script>
 </body>
 </html>"
 }

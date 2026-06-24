@@ -5,15 +5,15 @@
 //// `.left-nav` (site title or logo + `.socials`) and `.right-nav` (menu items
 //// + search button + theme toggle).
 ////
-//// Internal links use `route.href/1` so modem intercepts them for client-side
-//// navigation. Social links are external and use `attribute.href/1` directly
-//// with `rel="me"` (apollo's default). The search button is wired via the
-//// `on_open_search` attribute parameter (Phase 12); the theme toggle is
-//// wired via the `on_toggle_theme` attribute parameter (Phase 10).
+//// Internal links use configured menu URLs and modem intercepts them for
+//// client-side navigation. Root-relative runtime assets and social feed links
+//// are resolved through `Config.base_path` so project-site deployments such as
+//// GitHub Pages under `/arata` do not request assets from the domain root.
 
 import config.{type Config}
 import gleam/list
 import gleam/option
+import gleam/string
 import lustre/attribute.{type Attribute}
 import lustre/element.{type Element}
 import lustre/element/html
@@ -22,14 +22,12 @@ import route.{type Route, Home, Links, Page, Post, Posts, Projects, Tag, Tags}
 /// Render the site header (`<nav>`).
 ///
 /// `current_route` is passed in so the active menu item can be highlighted
-/// with an `active` class (apollo itself does not highlight the active nav
-/// item; this is a small arata addition for better wayfinding).
+/// with an `active` class.
 ///
-/// `on_toggle_menu` is wired to the mobile hamburger button (visible only
-/// below 992px via CSS). `mobile_menu_open` adds a `mobile-open` class to the
-/// `.right-nav` so the dropdown shows on mobile.
+/// `on_toggle_menu` is wired to the mobile hamburger button. `mobile_menu_open`
+/// adds a `mobile-open` class to `.right-nav` so the dropdown shows on mobile.
 pub fn view(
-  config: Config,
+  site_config: Config,
   current_route: Route,
   on_toggle_theme: Attribute(msg),
   on_open_search: Attribute(msg),
@@ -38,8 +36,11 @@ pub fn view(
 ) -> Element(msg) {
   html.nav([], [
     html.div([attribute.class("left-nav")], [
-      view_site_title(config),
-      html.div([attribute.class("socials")], view_socials(config.socials)),
+      view_site_title(site_config),
+      html.div(
+        [attribute.class("socials")],
+        view_socials(site_config, site_config.socials),
+      ),
     ]),
     html.button(
       [
@@ -49,7 +50,7 @@ pub fn view(
         attribute.attribute("aria-expanded", bool_to_attr(mobile_menu_open)),
         on_toggle_menu,
       ],
-      [html.text("\u{2630}")],
+      [html.text("☰")],
     ),
     html.div(
       [
@@ -58,16 +59,13 @@ pub fn view(
           #("mobile-open", mobile_menu_open),
         ]),
       ],
-      // Menu items (internal links) followed by the search button (wired via
-      // on_open_search, omitted when `config.search_enabled` is `False`) and
-      // the theme toggle (wired via on_toggle_theme).
       list.flatten([
-        view_menu(config.menu, current_route),
-        case config.search_enabled {
-          True -> [view_search_button(on_open_search)]
+        view_menu(site_config.menu, current_route, site_config.base_path),
+        case site_config.search_enabled {
+          True -> [view_search_button(site_config, on_open_search)]
           False -> []
         },
-        [view_theme_toggle(on_toggle_theme)],
+        [view_theme_toggle(site_config, on_toggle_theme)],
       ]),
     ),
   ])
@@ -80,97 +78,149 @@ fn bool_to_attr(b: Bool) -> String {
   }
 }
 
+/// Resolve a site-local URL against the configured deployment base path.
+///
+/// External URLs are returned unchanged:
+///
+///   https://github.com/... -> https://github.com/...
+///
+/// Root-relative URLs are prefixed:
+///
+///   /rss.xml -> /arata/rss.xml
+///   /icons/search.svg -> /arata/icons/search.svg
+///
+/// Already-prefixed URLs are returned unchanged to avoid `/arata/arata/...`.
+fn resolve_site_url(site_config: Config, url: String) -> String {
+  let base_path = config.normalize_base_path(site_config.base_path)
+
+  case string.starts_with(url, "/") {
+    False -> url
+
+    True ->
+      case
+        base_path != ""
+        && { url == base_path || string.starts_with(url, base_path <> "/") }
+      {
+        True -> url
+
+        False -> config.with_base_path(base_path, url)
+      }
+  }
+}
+
+/// Strip the configured base path before comparing a configured menu URL with
+/// the internal typed `Route`.
+///
+/// Example:
+///
+///   /arata/posts -> /posts
+fn strip_base_path(path: String, base_path: String) -> String {
+  let base_path = config.normalize_base_path(base_path)
+
+  case base_path {
+    "" -> path
+
+    _ ->
+      case path == base_path {
+        True -> "/"
+
+        False ->
+          case string.starts_with(path, base_path <> "/") {
+            True -> {
+              let base_len = string.length(base_path)
+              string.slice(path, base_len, string.length(path) - base_len)
+            }
+
+            False -> path
+          }
+      }
+  }
+}
+
 /// Whether the menu item with `url` is the active nav entry for
-/// `current_route`. Matches apollo's URL scheme:
-///
-///   "/"          -> Home
-///   "/posts"     -> Posts(_) or Post(_) (single posts are still in the
-///                   posts section, so the section link stays active)
-///   "/projects"  -> Projects
-///   "/links"     -> Links
-///   "/tags"      -> Tags or Tag(_) (single-tag pages are still in the
-///                   tags section, so the section link stays active)
-///   "/about"     -> Page("about")
-///
-/// `/projects/{slug}` parses as `Page(slug)` rather than `Projects`, so the
-/// section link only highlights on the section index itself (matching
-/// apollo's section/page distinction). A future phase can refine this if
-/// desired.
-fn is_active(current_route: Route, url: String) -> Bool {
+/// `current_route`.
+fn is_active(current_route: Route, url: String, base_path: String) -> Bool {
+  let url = strip_base_path(url, base_path)
+
   case url {
     "/" ->
       case current_route {
         Home -> True
         _ -> False
       }
+
     "/posts" ->
       case current_route {
         Posts(_) -> True
         Post(_) -> True
         _ -> False
       }
+
     "/projects" ->
       case current_route {
         Projects -> True
         _ -> False
       }
+
     "/links" ->
       case current_route {
         Links -> True
         _ -> False
       }
+
     "/tags" ->
       case current_route {
         Tags -> True
         Tag(_) -> True
         _ -> False
       }
+
     "/about" ->
       case current_route {
         Page("about") -> True
         _ -> False
       }
+
     _ -> False
   }
 }
 
 // LEFT NAV ---------------------------------------------------------------------
 
-fn view_site_title(config: Config) -> Element(msg) {
-  case config.logo {
+fn view_site_title(site_config: Config) -> Element(msg) {
+  case site_config.logo {
     option.Some(path) ->
       html.a([route.href(route.Home), attribute.class("logo")], [
-        html.img([attribute.alt(config.title), attribute.src(path)]),
+        html.img([
+          attribute.alt(site_config.title),
+          attribute.src(resolve_site_url(site_config, path)),
+        ]),
       ])
-    option.None -> html.a([route.href(route.Home)], [html.text(config.title)])
+
+    option.None ->
+      html.a([route.href(route.Home)], [html.text(site_config.title)])
   }
 }
 
-fn view_socials(socials: List(config.Social)) -> List(Element(msg)) {
+fn view_socials(
+  site_config: Config,
+  socials: List(config.Social),
+) -> List(Element(msg)) {
   list.map(socials, fn(social) {
-    // Fix 9b/10: `target="_blank"` opens social links in a new tab. This
-    // also stops modem (the SPA router) from intercepting same-origin
-    // clicks — without it, clicking the RSS link on a sub-page like
-    // `/posts/markdown` would be hijacked by the router and 404 instead
-    // of fetching `/atom.xml`. External links (GitHub, etc.) already
-    // open in a new tab anyway, so this is consistent for all socials.
-    //
-    // Fix 8+9: `rel="noopener"` (rather than `rel="me"`) is the right
-    // pairing for `target="_blank"` — it prevents the new tab from
-    // accessing `window.opener` and is the standard recommendation for
-    // any link that opens in a new browsing context. `rel="me"` is for
-    // indieweb identity links and is not appropriate here.
     html.a(
       [
         attribute.class("social"),
-        attribute.href(social.url),
+        attribute.href(resolve_site_url(site_config, social.url)),
         attribute.target("_blank"),
         attribute.rel("noopener"),
       ],
       [
         html.img([
           attribute.alt(social.name),
-          attribute.src("/icons/social/" <> social.icon <> ".svg"),
+          attribute.src(resolve_site_url(
+            site_config,
+            "/icons/social/" <> social.icon <> ".svg",
+          )),
         ]),
       ],
     )
@@ -182,27 +232,26 @@ fn view_socials(socials: List(config.Social)) -> List(Element(msg)) {
 fn view_menu(
   menu: List(config.MenuItem),
   current_route: Route,
+  base_path: String,
 ) -> List(Element(msg)) {
   list.map(menu, fn(item) {
-    // Menu URLs are same-origin paths; modem intercepts the click and routes
-    // through `parse_route`. Using `attribute.href` (rather than `route.href`)
-    // because the URL is a raw string from config, not a typed `Route`.
-    //
-    // The `active` class is added (via `attribute.classes`) when this item's
-    // URL matches `current_route` per `is_active`; `arata.css` paints an
-    // active item with `--primary-color`.
     html.a(
       [
         attribute.href(item.url),
         attribute.style("margin-right", "0.5em"),
-        attribute.classes([#("active", is_active(current_route, item.url))]),
+        attribute.classes([
+          #("active", is_active(current_route, item.url, base_path)),
+        ]),
       ],
       [html.text(item.name)],
     )
   })
 }
 
-fn view_search_button(on_open: Attribute(msg)) -> Element(msg) {
+fn view_search_button(
+  site_config: Config,
+  on_open: Attribute(msg),
+) -> Element(msg) {
   html.button(
     [
       attribute.id("search-button"),
@@ -212,7 +261,7 @@ fn view_search_button(on_open: Attribute(msg)) -> Element(msg) {
     ],
     [
       html.img([
-        attribute.src("/icons/search.svg"),
+        attribute.src(resolve_site_url(site_config, "/icons/search.svg")),
         attribute.alt("Search"),
         attribute.class("search-icon"),
       ]),
@@ -220,19 +269,10 @@ fn view_search_button(on_open: Attribute(msg)) -> Element(msg) {
   )
 }
 
-fn view_theme_toggle(on_toggle: Attribute(msg)) -> Element(msg) {
-  // apollo renders this as an `<a id="dark-mode-toggle">` with inline
-  // `onclick`. arata uses a `<button>` carrying both the apollo id and a class
-  // so the ported CSS (`#dark-mode-toggle`) applies. The `on_toggle` attribute
-  // (an `event.on_click(UserToggledTheme)` from the caller) dispatches the
-  // theme-cycle message. Three icons (sun/moon/auto) are rendered; the FFI
-  // shows/hides them based on the current theme.
-  //
-  // Fix 14: the sun and moon icons start with `display:none` so only the
-  // AUTO icon is visible on initial render. The default theme is `Auto`
-  // (resolves to the system preference), so this matches what most users
-  // see on first visit. The FFI's `apply_theme` overwrites `display` once
-  // it loads, so this initial inline style is purely a no-flicker default.
+fn view_theme_toggle(
+  site_config: Config,
+  on_toggle: Attribute(msg),
+) -> Element(msg) {
   html.button(
     [
       attribute.id("dark-mode-toggle"),
@@ -241,27 +281,22 @@ fn view_theme_toggle(on_toggle: Attribute(msg)) -> Element(msg) {
     ],
     [
       html.img([
-        attribute.src("/icons/sun.svg"),
+        attribute.src(resolve_site_url(site_config, "/icons/sun.svg")),
         attribute.id("sun-icon"),
         attribute.alt("Light"),
         attribute.style("display", "none"),
       ]),
       html.img([
-        attribute.src("/icons/moon.svg"),
+        attribute.src(resolve_site_url(site_config, "/icons/moon.svg")),
         attribute.id("moon-icon"),
         attribute.alt("Dark"),
         attribute.style("display", "none"),
         attribute.style("filter", "invert(1)"),
       ]),
       html.img([
-        attribute.src("/icons/auto.svg"),
+        attribute.src(resolve_site_url(site_config, "/icons/auto.svg")),
         attribute.id("auto-icon"),
         attribute.alt("Auto"),
-        // Fix 11: `display: block` matches the sun/moon icons' rendered
-        // state (the FFI sets them to `display: block` once it shows them),
-        // and `filter: invert(1)` makes the auto icon visible on both light
-        // and dark backgrounds — the source SVG is a solid silhouette so
-        // inverting keeps it readable in either theme.
         attribute.style("display", "block"),
         attribute.style("filter", "invert(1)"),
       ]),

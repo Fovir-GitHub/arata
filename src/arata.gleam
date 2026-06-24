@@ -646,7 +646,7 @@ fn view_route_content(model: Model) -> #(Element(Msg), Element(Msg)) {
           model.posts,
           model.links,
           model.projects,
-          model.config.aratafetch_maintain_for,
+          model.config.aratafetch_maintained_for,
         )
 
       let fetch_el = aratafetch.view(model.config.aratafetch_enabled, stats)

@@ -12,6 +12,7 @@
 //// files still decode, while newer builds get deterministic Zola-style
 //// ordering.
 
+import config
 import data/link.{type Link, Link}
 import data/page.{type Page, Page}
 import data/post.{type Post, type TocEntry, Post, TocEntry}
@@ -50,7 +51,11 @@ pub fn load() -> Effect(ContentMsg) {
     rsvp.expect_json(decode_content_index(), fn(result) {
       ContentLoaded(result)
     })
-  rsvp.get("/content_index.json", handler)
+
+  let site_config = config.default()
+  let url = config.with_base_path(site_config.base_path, "/content_index.json")
+
+  rsvp.get(url, handler)
 }
 
 /// A decoder for `content_index.json`.

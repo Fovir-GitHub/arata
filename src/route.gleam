@@ -19,15 +19,23 @@
 ////   `/tags/{name}`       -> Tag(name)
 ////   `/{slug}`            -> Page(slug)      (standalone page, e.g. /about)
 ////   anything else        -> NotFound(uri)
+//// Routing: maps browser URLs to arata's internal `Route` type and back.
+////
+//// Important for non-root deployments:
+//// GitHub Pages project sites are served under a base path such as `/arata`.
+//// Browser URLs look like `/arata/posts/configuration`, but the internal
+//// router must see `/posts/configuration`. Therefore `parse_route` strips the
+//// configured base path before matching, while `href_url` prefixes generated
+//// links with that base path.
 
+import config
 import gleam/int
+import gleam/string
 import gleam/uri.{type Uri}
 import lustre/attribute.{type Attribute}
 
-/// The set of pages arata can render. One variant per apollo page template.
 pub type Route {
   Home
-  /// The paginated post list. `page` is 1-indexed.
   Posts(page: Int)
   Post(slug: String)
   Projects
@@ -35,83 +43,105 @@ pub type Route {
   Tags
   Tag(name: String)
   Page(slug: String)
-  /// A URI we could not match. Kept so we can log it or hint at a typo. Note
-  /// that `NotFound` cannot round-trip through `href` (its URL is a placeholder
-  /// `/404`); every other variant does.
   NotFound(uri: Uri)
 }
 
-/// Parse a browser URI into a `Route`.
-///
-/// Section indices (`/posts`, `/projects`, `/links`, `/tags`) are matched
-/// before single-segment standalone pages so that e.g. `/posts` is `Posts(1)`
-/// and not `Page("posts")`. The paginated index `/posts/page/{n}` is matched
-/// before single-post `/posts/{slug}` so the literal segment `"page"` is
-/// reserved. Detail pages under `/projects/` parse as `Page(slug)` — apollo
-/// renders them as `page.html`. (`/links` has no detail pages.)
 pub fn parse_route(uri: Uri) -> Route {
-  case uri.path_segments(uri.path) {
+  let site_config = config.default()
+  let path = strip_base_path(uri.path, site_config.base_path)
+
+  case uri.path_segments(path) {
     [] | [""] -> Home
 
-    // /posts and /posts/page/{n} — paginated section index.
     ["posts"] -> Posts(1)
+
     ["posts", "page", page] ->
       case int.parse(page) {
         Ok(page) -> Posts(page)
+
         Error(_) -> NotFound(uri:)
       }
 
-    // /posts/{slug} — single post.
     ["posts", slug] -> Post(slug)
 
     ["projects"] -> Projects
+
     ["projects", slug] -> Page(slug:)
+
     ["links"] -> Links
+
     ["tags"] -> Tags
+
     ["tags", name] -> Tag(name:)
 
-    // Static files that should not be handled by the SPA router.
     ["atom.xml"]
     | ["rss.xml"]
     | ["robots.txt"]
+    | ["llms.txt"]
     | ["sitemap.xml"]
     | ["content_index.json"]
     | ["search_index.json"]
     | ["app.mjs"]
     | ["arata.css"] -> NotFound(uri:)
 
-    // Any other single segment is a standalone page (e.g. /about, /404).
     [slug] -> Page(slug:)
 
-    // Anything with two or more segments that didn't match above is unknown.
     _ -> NotFound(uri:)
   }
 }
 
-/// Serialise a `Route` back into an `href` attribute for `<a>` elements.
-///
-/// Must stay in sync with `parse_route`. For every `Route` produced by
-/// `parse_route` except `NotFound`, `parse_route(href_url(route)) == route`.
-/// `NotFound` is by definition a non-matching URI, so its `href` is a
-/// placeholder (`/404`) that parses to `Page("404")` — this is intentional and
-/// matches the lustre `01-routing` example's behaviour.
+fn strip_base_path(path: String, base_path: String) -> String {
+  let base_path = config.normalize_base_path(base_path)
+
+  case base_path {
+    "" -> path
+
+    _ ->
+      case path == base_path {
+        True -> "/"
+
+        False ->
+          case string.starts_with(path, base_path <> "/") {
+            True -> {
+              let base_len = string.length(base_path)
+              string.slice(path, base_len, string.length(path) - base_len)
+            }
+
+            False -> path
+          }
+      }
+  }
+}
+
 pub fn href(route: Route) -> Attribute(message) {
   attribute.href(href_url(route))
 }
 
-/// The URL string a `Route` serialises to. Exposed so other modules can build
-/// links without going through the `Attribute` type (e.g. for `modem.push`).
 pub fn href_url(route: Route) -> String {
+  let site_config = config.default()
+  config.with_base_path(site_config.base_path, raw_href_url(route))
+}
+
+fn raw_href_url(route: Route) -> String {
   case route {
     Home -> "/"
+
     Posts(1) -> "/posts"
+
     Posts(page) -> "/posts/page/" <> int.to_string(page)
+
     Post(slug) -> "/posts/" <> slug
+
     Projects -> "/projects"
+
     Links -> "/links"
+
     Tags -> "/tags"
+
     Tag(name) -> "/tags/" <> name
+
     Page(slug) -> "/" <> slug
+
     NotFound(_) -> "/404"
   }
 }

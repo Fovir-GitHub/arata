@@ -301,7 +301,7 @@ When `True`, post pages render the floating ToC/tags button and overlay.
 
 When `False`, the floating button and overlay are omitted.
 
-### `aratafetch_enabled` and `aratafetch_maintain_for`
+### `aratafetch_enabled` and `aratafetch_maintained_for`
 
 `aratafetch` is an optional neofetch-style homepage summary block. When
 enabled, it is rendered at the bottom of the homepage content, after the
@@ -324,7 +324,7 @@ Config(
   // ...
   floating_buttons_enabled: True,
   aratafetch_enabled: True,
-  aratafetch_maintain_for: Some("since 2024-06-23"),
+  aratafetch_maintained_for: Some("since 2026-06-21"),
 )
 ```
 
@@ -337,21 +337,21 @@ aratafetch_enabled: False,
 When disabled, the homepage renders exactly as before and no aratafetch DOM is
 emitted.
 
-`aratafetch_maintain_for` is an `Option(String)` rendered as-is in the
+`aratafetch_maintained_for` is an `Option(String)` rendered as-is in the
 `maintained` row.
 
 Examples:
 
 ```gleam
-aratafetch_maintain_for: Some("since 2026-06-21")
+aratafetch_maintained_for: Some("since 2026-06-21")
 ```
 
 ```gleam
-aratafetch_maintain_for: Some("2 years")
+aratafetch_maintained_for: Some("2 years")
 ```
 
 ```gleam
-aratafetch_maintain_for: None
+aratafetch_maintained_for: None
 ```
 
 When `None`, the `maintained` row displays `n/a`.
