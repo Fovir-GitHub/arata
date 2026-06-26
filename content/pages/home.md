@@ -56,9 +56,3 @@ content/projects/
 5. **Configure and publish your site**
 
 Checkout the [configuration guide](posts/configuration) and the [deployment guide](posts/deployment).
-
----
-
-**[root@arata:~]# aratafetch**
-
-**>**
