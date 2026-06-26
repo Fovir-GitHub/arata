@@ -15,6 +15,7 @@
 //// fetch at runtime.
 
 import build/feeds
+import build/feeds_style
 import build/llms
 import build/robots
 import config
@@ -87,11 +88,34 @@ pub fn run() -> Result(Nil, String) {
   // 3. Feeds. Only emit `atom.xml` / `rss.xml` when RSS is enabled in the
   // site metadata; otherwise the feed files are skipped. This mirrors
   // blogatto's opt-out feed model.
+  //
+  // The XML stylesheet hrefs are resolved through `Config.base_path` so
+  // subdirectory deployments such as GitHub Pages project sites load the XSL
+  // files from the correct public path:
+  //
+  //   root deployment:       /atom.xsl
+  //   /arata deployment:     /arata/atom.xsl
+  //
+  // The actual `atom.xsl` / `rss.xsl` files are emitted by the feed style
+  // build step.
   case site_meta.rss_enabled {
     True -> {
-      write(dist_dir <> "/atom.xml", feeds.atom_feed(site_meta, posts))
-      write(dist_dir <> "/rss.xml", feeds.rss_feed(site_meta, posts))
+      let atom_xsl_href =
+        config.with_base_path(site_config.base_path, "/atom.xsl")
+      let rss_xsl_href =
+        config.with_base_path(site_config.base_path, "/rss.xsl")
+      write(
+        dist_dir <> "/atom.xml",
+        feeds.atom_feed(site_meta, posts, atom_xsl_href),
+      )
+      write(
+        dist_dir <> "/rss.xml",
+        feeds.rss_feed(site_meta, posts, rss_xsl_href),
+      )
+      write(dist_dir <> "/atom.xsl", feeds_style.atom_xsl())
+      write(dist_dir <> "/rss.xsl", feeds_style.rss_xsl())
     }
+
     False -> Nil
   }
 

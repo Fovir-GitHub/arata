@@ -107,9 +107,24 @@ pub type Config {
 }
 
 /// Hardcoded default site metadata used by the build pipeline and SPA runtime.
+///
+/// `base_url` is canonicalized at the configuration boundary. This keeps
+/// trailing-slash variants equivalent for all downstream build outputs:
+///
+///   https://example.com/blog
+///   https://example.com/blog/
+///
+/// Both are stored internally as:
+///
+///   https://example.com/blog
+///
+/// This prevents drift between `base_path`, feed URLs, sitemap URLs, robots.txt,
+/// llms.txt, the SPA shell, and runtime content metadata.
 pub fn site_meta() -> SiteMeta {
+  let base_url = canonical_base_url("https://yonzilch.github.io/")
+
   SiteMeta(
-    base_url: "https://yonzilch.github.io/arata",
+    base_url: base_url,
     title: "Arata",
     description: "A modern and minimalistic blog theme",
     analytics: AnalyticsDisabled,
@@ -197,20 +212,40 @@ fn default_socials(rss_enabled: Bool) -> List(Social) {
   ])
 }
 
+/// Canonicalize the public deployed site URL.
+///
+/// This helper intentionally trims trailing slashes at the config boundary
+/// instead of forcing every output generator to guess whether it should join
+/// with `base_url` directly. It keeps these values equivalent:
+///
+///   https://example.com
+///   https://example.com/
+///
+///   https://example.com/blog
+///   https://example.com/blog/
+///
+/// The configured value is still written in one place, but the rest of the
+/// application receives a stable no-trailing-slash canonical form.
+pub fn canonical_base_url(url: String) -> String {
+  url
+  |> string.trim
+  |> trim_trailing_slashes
+}
+
 /// Derive a deployment base path from `SiteMeta.base_url`.
 ///
 /// Examples:
-///   https://example.com        -> ""
-///   https://example.com/       -> ""
+///   https://example.com          -> ""
+///   https://example.com/         -> ""
 ///   https://user.github.io/arata -> "/arata"
+///   https://user.github.io/arata/ -> "/arata"
 ///
 /// This keeps GitHub Pages project deployments working without hardcoding
 /// root-absolute asset URLs like `/app.mjs`.
 pub fn base_path_from_url(url: String) -> String {
   let cleaned =
     url
-    |> string.trim
-    |> trim_trailing_slashes
+    |> canonical_base_url
 
   case string.split_once(cleaned, "://") {
     Ok(#(_scheme, rest)) -> base_path_from_host_and_path(rest)
