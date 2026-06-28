@@ -70,7 +70,7 @@ No file system access happens in the browser.
 - **Analytics**: GoatCounter, Umami (Google Analytics intentionally not supported).
 - **Comments**: Giscus, Utterances.
 - **Inline CSS shell** — CSS modules are inlined into `index.html` and `404.html` to remove render-blocking stylesheet requests; `dist/css/` is still emitted for inspection/debugging.
-- **Accent color** `#3555b3` (dark blue), editable in a single CSS variable.
+- **Accent color** `#3555b3` (deep dark blue), editable in a single CSS variable.
 - **Config toggles** — `sidebar_enabled`, `floating_buttons_enabled`, `search_enabled`, `rss_enabled`, `mathjax_enabled`, and `aratafetch_enabled` let you turn features on or off without touching view code.
 - **Configurable logo and favicon** — both are configured from `src/config.gleam`.
 - **Build pipeline**: `gleam run -m build/pipeline` → complete static site in `dist/` (no Erlang/OTP required).
@@ -125,16 +125,19 @@ arata/
 │   │   ├── feeds.gleam        # atom.xml, rss.xml, sitemap.xml
 │   │   ├── robots.gleam       # robots.txt
 │   │   └── llms.gleam         # llms.txt
-│   └── css/                   # 10 CSS modules (inlined into HTML shell at build time)
+│   └── css/                   # 13 CSS modules (inlined into HTML shell at build time)
 │       ├── base.css           # theme vars, html/body, headings, links
 │       ├── layout.css         # .arata-shell, .content, nav, .logo
-│       ├── components.css     # .page-header, .post-list, .pagination, tags, ...
+│       ├── components.css     # .page-header, .post-list, tags, icon buttons, sidebar post tags
+│       ├── pagination.css     # pagination links and page-jump input
 │       ├── post.css           # blockquote, .tldr, img/figure, table, code, labels
 │       ├── cards.css          # .cards, .card-*, project cards
 │       ├── links.css          # friend-link avatars
 │       ├── search.css         # search button/modal/results
 │       ├── toc.css            # table of contents
 │       ├── syntax.css         # giallo light/dark syntax highlighting
+│       ├── lightbox.css       # Markdown image lightbox overlay
+│       ├── aratafetch.css     # homepage neofetch-style summary
 │       └── accessibility.css  # :focus-visible outlines + .skip-link
 ├── content/                   # file-based content (authored Markdown)
 │   ├── posts/*.md             # blog posts
@@ -251,46 +254,73 @@ Highlights:
 * **`aratafetch_maintained_for`** (`Option(String)`) — optional display string for aratafetch's `maintained` row, for example `Some("since 2024-06-23")`.
 * **`fonts`** — a `Fonts(text, header, code)` record of CSS `font-family` declarations. Defaults to system font stacks.
 * **`analytics`** — `AnalyticsDisabled`, `GoatCounter(user, host)`, or `Umami(website_id, host_url)`. Google Analytics is intentionally not supported.
-* **Accent color** — edit `--primary-color: #3555b3;` in `src/css/base.css` to recolor every accent surface.
+* **Accent color** — edit `--primary-color` in `src/css/theme.css` to recolor accent surfaces. Arata defines separate light and dark accent values in `:root` and `:root.dark` for better contrast across themes.
 
 See [configuration.md](content/posts/configuration.md) for the full configuration guide.
 
 ## CSS
 
-Arata keeps its source CSS split into 10 modules under `src/css/`:
+Arata keeps its source CSS split into 17 modules under `src/css/`:
 
 ```txt
-base.css
+fonts.css
+theme.css
+globals.css
+typography.css
+home.css
 layout.css
 components.css
+pagination.css
 post.css
 cards.css
 links.css
 search.css
 toc.css
 syntax.css
+lightbox.css
+aratafetch.css
 accessibility.css
-```
+````
 
-During the build, these modules are copied to `dist/css/` for inspection and debugging. For runtime performance, however, the SPA shell no longer references them through render-blocking `<link rel="stylesheet">` tags. Instead, the build pipeline inlines the CSS modules into `index.html` and `404.html` inside:
+During the build, these modules are copied to `dist/css/` for inspection and debugging.
 
+For runtime performance, however, the SPA shell no longer references them through render-blocking `<link rel="stylesheet">` tags.
+
+Instead, the build pipeline inlines the CSS modules into `index.html` and `404.html` inside a `<style>` block.
 
 The CSS order is fixed and important:
 
 ```txt
-base
+fonts
+theme
+globals
+typography
+home
 layout
 components
+pagination
 post
 cards
 links
 search
 toc
 syntax
+lightbox
+aratafetch
 accessibility
 ```
 
-`base.css` must come first because it defines theme variables and resets. `accessibility.css` should remain last because it contains focus-visible and accessibility overrides.
+`fonts.css` must come first because it declares bundled font faces. 
+
+`theme.css` must come before all other modules that use CSS variables.
+
+`globals.css` sets document-level defaults and responsive root scaling.
+
+`typography.css` defines global heading, link, selection, separator, time, deletion, and MathJax overflow behavior.
+
+`home.css` comes after typography so homepage latest-post styles can override global link hover behavior.
+
+`accessibility.css` should remain last because it contains focus-visible and accessibility overrides.
 
 ## Build output
 
